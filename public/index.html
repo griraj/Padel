@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Padel 3D — Online Multiplayer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green: #00e676;
+    --green-dim: #00b352;
+    --court: #2d6a2d;
+    --bg: #0a0f0a;
+    --panel: rgba(10,20,10,0.92);
+    --text: #e8f5e9;
+    --accent: #ffe57f;
+    --red: #ff5252;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    overflow: hidden;
+  }
+
+  #canvas { display: block; width: 100%; height: 100%; }
+
+  /* ── HUD ─────────────────────────────────────────── */
+  #hud {
+    position: fixed; inset: 0; pointer-events: none;
+    z-index: 10;
+  }
+
+  #scoreboard {
+    position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 0;
+    background: var(--panel);
+    border: 1px solid rgba(0,230,118,0.25);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 32px rgba(0,0,0,0.7);
+    font-family: 'Bebas Neue', sans-serif;
+    letter-spacing: 0.05em;
+  }
+
+  .score-side {
+    padding: 10px 28px;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 140px;
+  }
+  .score-side.me { background: rgba(0,230,118,0.08); }
+  .score-side.opp { background: rgba(255,82,82,0.06); }
+
+  .player-name { font-size: 13px; letter-spacing: 0.12em; opacity: 0.7; font-family: 'Inter', sans-serif; font-weight: 600; }
+  .player-score { font-size: 52px; line-height: 1; color: var(--green); }
+  .score-side.opp .player-score { color: var(--red); }
+
+  .score-divider {
+    padding: 0 16px;
+    font-size: 36px; color: rgba(255,255,255,0.2);
+    display: flex; align-items: center;
+  }
+
+  #serving-label {
+    position: absolute; top: 110px; left: 50%; transform: translateX(-50%);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 15px; letter-spacing: 0.3em;
+    color: var(--accent);
+    opacity: 0; transition: opacity 0.3s;
+    text-transform: uppercase;
+  }
+
+  #controls-hint {
+    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 20px;
+    font-size: 12px; opacity: 0.4; letter-spacing: 0.08em;
+  }
+  .hint-key {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px; padding: 4px 10px;
+  }
+
+  /* ── Countdown ───────────────────────────────────── */
+  #countdown-overlay {
+    position: fixed; inset: 0; z-index: 50;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.55);
+    pointer-events: none;
+    opacity: 0; transition: opacity 0.2s;
+  }
+  #countdown-overlay.visible { opacity: 1; }
+  #countdown-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 180px; line-height: 1;
+    color: var(--green);
+    text-shadow: 0 0 80px rgba(0,230,118,0.6);
+    animation: popIn 0.35s cubic-bezier(0.36,0.07,0.19,0.97) both;
+  }
+  #countdown-label {
+    font-size: 16px; letter-spacing: 0.4em; opacity: 0.6;
+    margin-top: -10px; font-family: 'Inter', sans-serif; font-weight: 300;
+  }
+  @keyframes popIn {
+    0% { transform: scale(1.8); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  /* ── Modals ──────────────────────────────────────── */
+  .modal-bg {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .modal {
+    background: linear-gradient(160deg, #0d1f0e 0%, #071007 100%);
+    border: 1px solid rgba(0,230,118,0.3);
+    border-radius: 20px;
+    padding: 48px 56px;
+    text-align: center;
+    max-width: 480px; width: 90%;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,230,118,0.1);
+    animation: slideUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes slideUp {
+    from { transform: translateY(40px); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+  }
+
+  .modal h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 64px; letter-spacing: 0.05em;
+    line-height: 1;
+    background: linear-gradient(135deg, #00e676, #69f0ae);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+  }
+  .modal .tagline {
+    font-size: 13px; letter-spacing: 0.2em; opacity: 0.4;
+    font-weight: 300; margin-bottom: 36px; text-transform: uppercase;
+  }
+  .modal input {
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(0,230,118,0.25);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 16px;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    margin-bottom: 16px;
+    transition: border-color 0.2s;
+  }
+  .modal input:focus { border-color: var(--green); }
+  .modal input::placeholder { opacity: 0.3; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 100%; padding: 15px 32px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px; letter-spacing: 0.15em;
+    border: none; border-radius: 10px; cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .btn:hover { transform: translateY(-2px); }
+  .btn:active { transform: translateY(0); }
+  .btn-primary {
+    background: linear-gradient(135deg, #00e676, #00b352);
+    color: #001a08;
+    box-shadow: 0 4px 24px rgba(0,230,118,0.35);
+  }
+  .btn-primary:hover { box-shadow: 0 6px 32px rgba(0,230,118,0.5); }
+  .btn-secondary {
+    background: rgba(255,255,255,0.07);
+    color: var(--text);
+    border: 1px solid rgba(255,255,255,0.12);
+    margin-top: 10px;
+  }
+
+  .modal-sub { font-size: 13px; opacity: 0.4; margin-top: 20px; letter-spacing: 0.05em; }
+
+  #waiting-modal .spinner {
+    width: 48px; height: 48px;
+    border: 3px solid rgba(0,230,118,0.15);
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 24px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #score-flash {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 60; pointer-events: none;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 56px; letter-spacing: 0.1em;
+    opacity: 0;
+  }
+
+  /* Game over specific */
+  #gameover-modal .winner-crown {
+    font-size: 56px; margin-bottom: 8px;
+  }
+  #gameover-modal h2 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 40px; letter-spacing: 0.08em;
+    color: var(--accent); margin-bottom: 4px;
+  }
+  #gameover-modal .final-score {
+    font-size: 64px; font-family: 'Bebas Neue', sans-serif;
+    letter-spacing: 0.15em; margin: 12px 0 28px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Three.js canvas -->
+<canvas id="canvas"></canvas>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="scoreboard">
+    <div class="score-side me">
+      <span class="player-name" id="name-me">YOU</span>
+      <span class="player-score" id="score-me">0</span>
+    </div>
+    <div class="score-divider">:</div>
+    <div class="score-side opp">
+      <span class="player-score" id="score-opp">0</span>
+      <span class="player-name" id="name-opp">OPP</span>
+    </div>
+  </div>
+  <div id="serving-label">SERVING</div>
+  <div id="controls-hint">
+    <span class="hint-key">MOUSE — Move paddle</span>
+    <span class="hint-key">WASD / ARROWS — Move paddle</span>
+  </div>
+</div>
+
+<!-- Score flash -->
+<div id="score-flash"></div>
+
+<!-- Countdown overlay -->
+<div id="countdown-overlay">
+  <div id="countdown-num">3</div>
+  <div id="countdown-label">GET READY</div>
+</div>
+
+<!-- Landing Modal -->
+<div class="modal-bg" id="landing-modal">
+  <div class="modal">
+    <h1>PADEL 3D</h1>
+    <p class="tagline">Online Multiplayer · Real Time</p>
+    <input type="text" id="name-input" placeholder="Enter your name" maxlength="16"/>
+    <button class="btn btn-primary" id="play-btn">FIND MATCH</button>
+    <p class="modal-sub">First to 7 points wins · Glass walls in play</p>
+  </div>
+</div>
+
+<!-- Waiting Modal -->
+<div class="modal-bg" id="waiting-modal" style="display:none">
+  <div class="modal">
+    <div class="spinner"></div>
+    <h1 style="font-size:40px">FINDING MATCH</h1>
+    <p class="tagline">Searching for opponent...</p>
+    <p class="modal-sub" id="waiting-sub">Share this link with a friend to play together</p>
+    <button class="btn btn-secondary" id="cancel-btn">CANCEL</button>
+  </div>
+</div>
+
+<!-- Game Over Modal -->
+<div class="modal-bg" id="gameover-modal" style="display:none">
+  <div class="modal">
+    <div class="winner-crown" id="result-crown">🏆</div>
+    <h2 id="result-title">YOU WIN!</h2>
+    <div class="final-score" id="final-score">7 — 3</div>
+    <button class="btn btn-primary" id="restart-btn">PLAY AGAIN</button>
+    <p class="modal-sub" id="restart-sub">Waiting for opponent...</p>
+  </div>
+</div>
+
+<!-- Socket.io -->
+<script src="/socket.io/socket.io.js"></script>
+<!-- Three.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════════════════════
+const COURT_W = 10, COURT_H = 20, WALL_H = 4;
+const NET_H = 0.92;
+const BALL_R = 0.15;
+
+// ═══════════════════════════════════════════════════════════
+//  THREE.JS SCENE
+// ═══════════════════════════════════════════════════════════
+const canvas = document.getElementById('canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x080d08);
+scene.fog = new THREE.Fog(0x080d08, 25, 60);
+
+// Camera — positioned behind player's side
+const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 200);
+let mySide = 1; // updated after match found
+function positionCamera() {
+  if (mySide === 1) {
+    camera.position.set(0, 8, 16);
+    camera.lookAt(0, 1, 0);
+  } else {
+    camera.position.set(0, 8, -16);
+    camera.lookAt(0, 1, 0);
+  }
+}
+positionCamera();
+
+// ── Lights ──────────────────────────────────────────────────
+const ambient = new THREE.AmbientLight(0x223322, 1.2);
+scene.add(ambient);
+
+const sun = new THREE.DirectionalLight(0xffffff, 1.8);
+sun.position.set(5, 18, 8);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 0.5;
+sun.shadow.camera.far = 80;
+sun.shadow.camera.left = -15; sun.shadow.camera.right = 15;
+sun.shadow.camera.top = 25; sun.shadow.camera.bottom = -25;
+sun.shadow.bias = -0.001;
+scene.add(sun);
+
+const fill = new THREE.DirectionalLight(0x88ffaa, 0.5);
+fill.position.set(-8, 5, -10);
+scene.add(fill);
+
+// Stadium lights
+[-4, 4].forEach(x => {
+  [-(COURT_H/2 - 1), (COURT_H/2 - 1)].forEach(z => {
+    const spot = new THREE.SpotLight(0xfff5cc, 1.2, 35, Math.PI/5, 0.4);
+    spot.position.set(x, 12, z);
+    spot.target.position.set(0, 0, z > 0 ? 4 : -4);
+    spot.castShadow = false;
+    scene.add(spot, spot.target);
+  });
+});
+
+// ── Court Floor ─────────────────────────────────────────────
+const floorGeo = new THREE.PlaneGeometry(COURT_W, COURT_H, 20, 40);
+const floorMat = new THREE.MeshLambertMaterial({ color: 0x1a5c1a });
+const floor = new THREE.Mesh(floorGeo, floorMat);
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+// Court lines
+function addLine(x1,z1,x2,z2, color=0xffffff, opacity=0.5) {
+  const pts = [new THREE.Vector3(x1,0.01,z1), new THREE.Vector3(x2,0.01,z2)];
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity });
+  scene.add(new THREE.Line(geo, mat));
+}
+// Boundary
+addLine(-COURT_W/2, -COURT_H/2,  COURT_W/2, -COURT_H/2);
+addLine(-COURT_W/2,  COURT_H/2,  COURT_W/2,  COURT_H/2);
+addLine(-COURT_W/2, -COURT_H/2, -COURT_W/2,  COURT_H/2);
+addLine( COURT_W/2, -COURT_H/2,  COURT_W/2,  COURT_H/2);
+// Center line
+addLine(0, -COURT_H/2, 0, COURT_H/2, 0xffffff, 0.25);
+// Service boxes
+addLine(-COURT_W/2, -COURT_H/4,  COURT_W/2, -COURT_H/4, 0xffffff, 0.3);
+addLine(-COURT_W/2,  COURT_H/4,  COURT_W/2,  COURT_H/4, 0xffffff, 0.3);
+
+// ── Walls ───────────────────────────────────────────────────
+const glassMat = new THREE.MeshPhongMaterial({
+  color: 0x88ccff,
+  transparent: true, opacity: 0.13,
+  side: THREE.DoubleSide,
+  shininess: 120,
+  specular: 0x88aaff,
+  depthWrite: false
+});
+const glassFrameMat = new THREE.MeshLambertMaterial({ color: 0xaaccaa });
+
+function addGlassWall(w, h, x, z, ry) {
+  // Glass panel
+  const geo = new THREE.PlaneGeometry(w, h);
+  const mesh = new THREE.Mesh(geo, glassMat);
+  mesh.position.set(x, h/2, z);
+  mesh.rotation.y = ry;
+  scene.add(mesh);
+  // Frame
+  const frameGeo = new THREE.EdgesGeometry(geo);
+  const frameMat = new THREE.LineBasicMaterial({ color: 0x99ddaa, transparent: true, opacity: 0.6 });
+  const frame = new THREE.LineSegments(frameGeo, frameMat);
+  frame.position.set(x, h/2, z);
+  frame.rotation.y = ry;
+  scene.add(frame);
+}
+
+// Back walls
+addGlassWall(COURT_W, WALL_H, 0, COURT_H/2, 0);
+addGlassWall(COURT_W, WALL_H, 0, -COURT_H/2, 0);
+// Side walls
+addGlassWall(COURT_H, WALL_H, COURT_W/2, 0, Math.PI/2);
+addGlassWall(COURT_H, WALL_H, -COURT_W/2, 0, Math.PI/2);
+
+// Wall tops (metal rail)
+const railMat = new THREE.MeshLambertMaterial({ color: 0x88aaaa });
+function rail(w, x, z, ry) {
+  const g = new THREE.CylinderGeometry(0.04, 0.04, w, 6);
+  const m = new THREE.Mesh(g, railMat);
+  m.position.set(x, WALL_H, z);
+  m.rotation.y = ry;
+  scene.add(m);
+}
+rail(COURT_W + 0.1, 0, COURT_H/2, 0);
+rail(COURT_W + 0.1, 0, -COURT_H/2, 0);
+rail(COURT_H + 0.1, COURT_W/2, 0, Math.PI/2);
+rail(COURT_H + 0.1, -COURT_W/2, 0, Math.PI/2);
+
+// ── Net ─────────────────────────────────────────────────────
+const netPostMat = new THREE.MeshLambertMaterial({ color: 0xbbbbbb });
+function netPost(x) {
+  const g = new THREE.CylinderGeometry(0.05, 0.05, NET_H, 8);
+  const m = new THREE.Mesh(g, netPostMat);
+  m.position.set(x, NET_H/2, 0);
+  scene.add(m);
+}
+netPost(-COURT_W/2);
+netPost(COURT_W/2);
+
+// Net band
+const netGeo = new THREE.PlaneGeometry(COURT_W, NET_H);
+const netMat = new THREE.MeshBasicMaterial({
+  color: 0xffffff, transparent: true, opacity: 0.15,
+  side: THREE.DoubleSide, wireframe: false
+});
+const net = new THREE.Mesh(netGeo, netMat);
+net.position.set(0, NET_H/2, 0);
+scene.add(net);
+
+// Net top band
+const bandGeo = new THREE.BoxGeometry(COURT_W + 0.1, 0.06, 0.04);
+const bandMat = new THREE.MeshLambertMaterial({ color: 0xeeeeee });
+const band = new THREE.Mesh(bandGeo, bandMat);
+band.position.set(0, NET_H, 0);
+scene.add(band);
+
+// Net grid lines
+for (let i = 0; i <= 20; i++) {
+  const x = -COURT_W/2 + i * (COURT_W/20);
+  addLine(x, 0, x, 0, 0xffffff, 0); // dummy, we'll do proper net
+}
+// Actual net lines
+const netLineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.18 });
+for (let i = 0; i <= 20; i++) {
+  const x = -COURT_W/2 + i*(COURT_W/20);
+  const pts = [new THREE.Vector3(x, 0.01, 0), new THREE.Vector3(x, NET_H, 0)];
+  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), netLineMat));
+}
+for (let j = 0; j <= 8; j++) {
+  const y = j * (NET_H/8);
+  const pts = [new THREE.Vector3(-COURT_W/2, y, 0), new THREE.Vector3(COURT_W/2, y, 0)];
+  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), netLineMat));
+}
+
+// ── Paddles ─────────────────────────────────────────────────
+function createPaddle(color) {
+  const group = new THREE.Group();
+  // Frame
+  const frameGeo = new THREE.BoxGeometry(1.2, 1.4, 0.1);
+  const frameMat = new THREE.MeshPhongMaterial({ color, shininess: 80 });
+  const frame = new THREE.Mesh(frameGeo, frameMat);
+  frame.castShadow = true;
+  group.add(frame);
+  // Strings grid
+  const strMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
+  for (let i = -4; i <= 4; i++) {
+    const x = i * 0.13;
+    const pts = [new THREE.Vector3(x, -0.6, 0.06), new THREE.Vector3(x, 0.6, 0.06)];
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), strMat));
+  }
+  for (let j = -5; j <= 5; j++) {
+    const y = j * 0.12;
+    const pts = [new THREE.Vector3(-0.55, y, 0.06), new THREE.Vector3(0.55, y, 0.06)];
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), strMat));
+  }
+  // Handle
+  const hGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.55, 8);
+  const hMat = new THREE.MeshPhongMaterial({ color: 0x222222 });
+  const handle = new THREE.Mesh(hGeo, hMat);
+  handle.position.set(0, -0.95, 0);
+  handle.castShadow = true;
+  group.add(handle);
+  return group;
+}
+
+const myPaddle = createPaddle(0x00e676);
+myPaddle.position.set(0, 0.9, COURT_H/2 - 1);
+scene.add(myPaddle);
+
+const oppPaddle = createPaddle(0xff5252);
+oppPaddle.position.set(0, 0.9, -(COURT_H/2 - 1));
+scene.add(oppPaddle);
+
+// ── Ball ────────────────────────────────────────────────────
+const ballGeo = new THREE.SphereGeometry(BALL_R, 24, 24);
+const ballMat = new THREE.MeshPhongMaterial({ color: 0xffff66, shininess: 120, specular: 0xffffff });
+const ball = new THREE.Mesh(ballGeo, ballMat);
+ball.castShadow = true;
+ball.position.set(0, 1.5, 0);
+scene.add(ball);
+
+// Ball shadow (projected circle on floor)
+const shadowGeo = new THREE.CircleGeometry(0.18, 16);
+const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false });
+const ballShadow = new THREE.Mesh(shadowGeo, shadowMat);
+ballShadow.rotation.x = -Math.PI/2;
+ballShadow.position.y = 0.005;
+scene.add(ballShadow);
+
+// Ball trail
+const TRAIL_LEN = 12;
+const trailPts = [];
+for (let i = 0; i < TRAIL_LEN; i++) trailPts.push(new THREE.Vector3());
+const trailGeo = new THREE.BufferGeometry().setFromPoints(trailPts);
+const trailMat = new THREE.LineBasicMaterial({ color: 0xffff99, transparent: true, opacity: 0.4, linewidth: 2 });
+const trail = new THREE.Line(trailGeo, trailMat);
+scene.add(trail);
+
+// ── Stadium / Environment ────────────────────────────────────
+// Bleachers (simple boxes)
+const bleacherMat = new THREE.MeshLambertMaterial({ color: 0x1a2a1a });
+function addBleacher(x, z, w, d) {
+  const g = new THREE.BoxGeometry(w, 3, d);
+  const m = new THREE.Mesh(g, bleacherMat);
+  m.position.set(x, 1.5, z);
+  scene.add(m);
+}
+addBleacher(0,  COURT_H/2 + 4, COURT_W + 8, 5);
+addBleacher(0, -COURT_H/2 - 4, COURT_W + 8, 5);
+addBleacher( COURT_W/2 + 4, 0, 4, COURT_H + 4);
+addBleacher(-COURT_W/2 - 4, 0, 4, COURT_H + 4);
+
+// ── Resize Handler ───────────────────────────────────────────
+function onResize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', onResize);
+onResize();
+
+// ═══════════════════════════════════════════════════════════
+//  INPUT
+// ═══════════════════════════════════════════════════════════
+const keys = {};
+document.addEventListener('keydown', e => keys[e.code] = true);
+document.addEventListener('keyup',   e => keys[e.code] = false);
+
+let mouseX = 0;
+const HW = COURT_W/2 - 0.7;
+document.addEventListener('mousemove', e => {
+  mouseX = ((e.clientX / window.innerWidth) * 2 - 1) * HW;
+});
+document.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  mouseX = ((t.clientX / window.innerWidth) * 2 - 1) * HW;
+}, { passive: false });
+
+// ═══════════════════════════════════════════════════════════
+//  SOCKET.IO
+// ═══════════════════════════════════════════════════════════
+const socket = io();
+let myId = null;
+let myPaddleData = { x: 0, z: COURT_H/2 - 1 };
+let oppPaddleData = { x: 0, z: -(COURT_H/2 - 1) };
+let ballData = { x: 0, y: 1.5, z: 0 };
+let inGame = false;
+let myName = 'Player';
+let oppName = 'Opponent';
+
+// Lerp targets
+let ballTarget = { x: 0, y: 1.5, z: 0 };
+
+socket.on('connect', () => { myId = socket.id; });
+
+socket.on('matchFound', (data) => {
+  hide('landing-modal'); hide('waiting-modal');
+  const me = data.players.find(p => p.id === myId);
+  const opp = data.players.find(p => p.id !== myId);
+  mySide = me.side;
+  myName = me.name;
+  oppName = opp.name;
+
+  document.getElementById('name-me').textContent = myName.toUpperCase();
+  document.getElementById('name-opp').textContent = oppName.toUpperCase();
+
+  positionCamera();
+  inGame = true;
+
+  if (mySide === 1) {
+    myPaddleData.z = COURT_H/2 - 1;
+    oppPaddleData.z = -(COURT_H/2 - 1);
+  } else {
+    myPaddleData.z = -(COURT_H/2 - 1);
+    oppPaddleData.z = COURT_H/2 - 1;
+  }
+  myPaddle.position.set(myPaddleData.x, 0.9, myPaddleData.z);
+  oppPaddle.position.set(oppPaddleData.x, 0.9, oppPaddleData.z);
+});
+
+socket.on('waiting', () => {
+  hide('landing-modal');
+  show('waiting-modal');
+});
+
+socket.on('countdown', (n) => {
+  if (n <= 0) {
+    document.getElementById('countdown-overlay').classList.remove('visible');
+  } else {
+    const overlay = document.getElementById('countdown-overlay');
+    overlay.classList.add('visible');
+    const numEl = document.getElementById('countdown-num');
+    numEl.style.animation = 'none';
+    numEl.textContent = n;
+    void numEl.offsetWidth;
+    numEl.style.animation = 'popIn 0.35s cubic-bezier(0.36,0.07,0.19,0.97) both';
+  }
+});
+
+socket.on('gameState', (data) => {
+  ballTarget = data.ball;
+  const me = data.players.find(p => p.id === myId);
+  const opp = data.players.find(p => p.id !== myId);
+  if (opp) {
+    oppPaddleData.x = opp.x;
+    oppPaddleData.z = opp.z;
+  }
+});
+
+socket.on('scored', (data) => {
+  const me = data.players.find(p => p.id === myId);
+  const opp = data.players.find(p => p.id !== myId);
+  if (me) document.getElementById('score-me').textContent = me.score;
+  if (opp) document.getElementById('score-opp').textContent = opp.score;
+
+  const flash = document.getElementById('score-flash');
+  const iMe = data.scorer === myName;
+  flash.textContent = iMe ? '🎾 POINT!' : '⚡ OPP SCORES';
+  flash.style.color = iMe ? '#00e676' : '#ff5252';
+  flash.style.opacity = '1';
+  flash.style.transform = 'translate(-50%, -50%) scale(1.1)';
+  flash.style.transition = 'none';
+  setTimeout(() => {
+    flash.style.transition = 'opacity 0.6s, transform 0.6s';
+    flash.style.opacity = '0';
+    flash.style.transform = 'translate(-50%, -60%) scale(0.8)';
+  }, 800);
+});
+
+socket.on('gameover', (data) => {
+  inGame = false;
+  const myScore = parseInt(document.getElementById('score-me').textContent);
+  const oppScore = parseInt(document.getElementById('score-opp').textContent);
+  const iWon = data.winner === myName;
+  document.getElementById('result-crown').textContent = iWon ? '🏆' : '😔';
+  document.getElementById('result-title').textContent = iWon ? 'YOU WIN!' : 'YOU LOST';
+  document.getElementById('result-title').style.color = iWon ? 'var(--accent)' : 'var(--red)';
+  document.getElementById('final-score').textContent = `${myScore} — ${oppScore}`;
+  document.getElementById('restart-sub').textContent = 'Waiting for both players...';
+  show('gameover-modal');
+});
+
+socket.on('waitingForRestart', (data) => {
+  document.getElementById('restart-sub').textContent = `${data.name} wants to play again...`;
+});
+
+socket.on('gameRestarted', () => {
+  hide('gameover-modal');
+  document.getElementById('score-me').textContent = '0';
+  document.getElementById('score-opp').textContent = '0';
+  inGame = true;
+});
+
+socket.on('opponentLeft', () => {
+  inGame = false;
+  hide('gameover-modal');
+  document.getElementById('result-crown').textContent = '👋';
+  document.getElementById('result-title').textContent = 'OPPONENT LEFT';
+  document.getElementById('result-title').style.color = 'var(--text)';
+  document.getElementById('final-score').textContent = '—';
+  document.getElementById('restart-btn').style.display = 'none';
+  show('gameover-modal');
+});
+
+// ── UI Controls ──────────────────────────────────────────────
+document.getElementById('play-btn').addEventListener('click', () => {
+  const name = document.getElementById('name-input').value.trim() || 'Player';
+  myName = name;
+  socket.emit('joinGame', { name });
+});
+document.getElementById('name-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('play-btn').click();
+});
+document.getElementById('cancel-btn').addEventListener('click', () => {
+  location.reload();
+});
+document.getElementById('restart-btn').addEventListener('click', () => {
+  socket.emit('restartGame');
+  document.getElementById('restart-sub').textContent = 'Waiting for opponent...';
+});
+
+function show(id) { document.getElementById(id).style.display = 'flex'; }
+function hide(id) { document.getElementById(id).style.display = 'none'; }
+
+// ═══════════════════════════════════════════════════════════
+//  GAME LOOP
+// ═══════════════════════════════════════════════════════════
+const MOVE_SPEED = 0.18;
+const HW_PADDLE = COURT_W/2 - 0.7;
+const HD_PADDLE = 0.7;
+let sendThrottle = 0;
+
+// Trail history
+const trailHistory = [];
+for (let i = 0; i < TRAIL_LEN; i++) trailHistory.push({ x: 0, y: 1.5, z: 0 });
+
+let lastTime = performance.now();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const now = performance.now();
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+
+  if (inGame) {
+    // Move my paddle
+    if (keys['ArrowLeft']  || keys['KeyA']) myPaddleData.x -= MOVE_SPEED;
+    if (keys['ArrowRight'] || keys['KeyD']) myPaddleData.x += MOVE_SPEED;
+    // Mouse X
+    myPaddleData.x += (mouseX - myPaddleData.x) * 0.15;
+
+    myPaddleData.x = Math.max(-HW_PADDLE, Math.min(HW_PADDLE, myPaddleData.x));
+
+    // Send paddle position
+    sendThrottle += dt;
+    if (sendThrottle >= 1/30) {
+      sendThrottle = 0;
+      socket.emit('paddleMove', { x: myPaddleData.x, z: myPaddleData.z });
+    }
+
+    // Update 3D paddle positions
+    myPaddle.position.x += (myPaddleData.x - myPaddle.position.x) * 0.35;
+    myPaddle.position.z = myPaddleData.z;
+
+    oppPaddle.position.x += (oppPaddleData.x - oppPaddle.position.x) * 0.25;
+    oppPaddle.position.z += (oppPaddleData.z - oppPaddle.position.z) * 0.25;
+
+    // Lerp ball
+    ball.position.x += (ballTarget.x - ball.position.x) * 0.35;
+    ball.position.y += (ballTarget.y - ball.position.y) * 0.35;
+    ball.position.z += (ballTarget.z - ball.position.z) * 0.35;
+    ball.rotation.x += (ballTarget.z - ball.position.z) * 0.5;
+    ball.rotation.z -= (ballTarget.x - ball.position.x) * 0.5;
+
+    // Ball shadow
+    ballShadow.position.x = ball.position.x;
+    ballShadow.position.z = ball.position.z;
+    const shadowScale = Math.max(0.1, 1 - ball.position.y * 0.08);
+    ballShadow.scale.set(shadowScale, shadowScale, 1);
+    shadowMat.opacity = Math.max(0, 0.4 - ball.position.y * 0.025);
+
+    // Trail
+    trailHistory.push({ x: ball.position.x, y: ball.position.y, z: ball.position.z });
+    if (trailHistory.length > TRAIL_LEN) trailHistory.shift();
+    const pos = trailGeo.attributes.position;
+    for (let i = 0; i < TRAIL_LEN; i++) {
+      const t = trailHistory[i] || { x: 0, y: 0, z: 0 };
+      pos.setXYZ(i, t.x, t.y, t.z);
+    }
+    pos.needsUpdate = true;
+    trailGeo.setFromPoints(trailHistory.map(t => new THREE.Vector3(t.x, t.y, t.z)));
+  }
+
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>
