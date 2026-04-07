@@ -6,227 +6,133 @@
 <title>Padel 3D — Online Multiplayer</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;600&display=swap');
-
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
   :root {
-    --green: #00e676;
-    --green-dim: #00b352;
-    --court: #2d6a2d;
-    --bg: #0a0f0a;
-    --panel: rgba(10,20,10,0.92);
-    --text: #e8f5e9;
-    --accent: #ffe57f;
-    --red: #ff5252;
+    --green:#00e676; --bg:#0a0f0a; --panel:rgba(8,18,8,0.94);
+    --text:#e8f5e9; --accent:#ffe57f; --red:#ff5252;
   }
+  html,body { width:100%;height:100%;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;overflow:hidden; }
+  #canvas { display:block;width:100%;height:100%; }
 
-  html, body {
-    width: 100%; height: 100%;
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Inter', sans-serif;
-    overflow: hidden;
-  }
-
-  #canvas { display: block; width: 100%; height: 100%; }
-
-  /* ── HUD ─────────────────────────────────────────── */
-  #hud {
-    position: fixed; inset: 0; pointer-events: none;
-    z-index: 10;
-  }
-
+  /* HUD */
+  #hud { position:fixed;inset:0;pointer-events:none;z-index:10; }
   #scoreboard {
-    position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
-    display: flex; align-items: center; gap: 0;
-    background: var(--panel);
-    border: 1px solid rgba(0,230,118,0.25);
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 4px 32px rgba(0,0,0,0.7);
-    font-family: 'Bebas Neue', sans-serif;
-    letter-spacing: 0.05em;
+    position:absolute;top:18px;left:50%;transform:translateX(-50%);
+    display:flex;align-items:center;
+    background:var(--panel);border:1px solid rgba(0,230,118,0.22);
+    border-radius:12px;overflow:hidden;box-shadow:0 4px 32px rgba(0,0,0,0.7);
+    font-family:'Bebas Neue',sans-serif;
   }
+  .score-side { padding:10px 28px;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:130px; }
+  .score-side.me  { background:rgba(0,230,118,0.07); }
+  .score-side.opp { background:rgba(255,82,82,0.05); }
+  .player-name { font-size:12px;letter-spacing:0.12em;opacity:0.65;font-family:'Inter',sans-serif;font-weight:600; }
+  .player-score { font-size:50px;line-height:1;color:var(--green); }
+  .score-side.opp .player-score { color:var(--red); }
+  .score-divider { padding:0 14px;font-size:34px;color:rgba(255,255,255,0.18);display:flex;align-items:center; }
 
-  .score-side {
-    padding: 10px 28px;
-    display: flex; flex-direction: column; align-items: center; gap: 2px;
-    min-width: 140px;
+  /* Menu button */
+  #menu-btn {
+    position:absolute;top:18px;right:22px;
+    pointer-events:all;cursor:pointer;
+    background:var(--panel);border:1px solid rgba(0,230,118,0.22);
+    border-radius:10px;padding:11px 16px;
+    display:flex;flex-direction:column;gap:5px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.5);
+    transition:border-color 0.2s,background 0.2s;
+    user-select:none;
   }
-  .score-side.me { background: rgba(0,230,118,0.08); }
-  .score-side.opp { background: rgba(255,82,82,0.06); }
-
-  .player-name { font-size: 13px; letter-spacing: 0.12em; opacity: 0.7; font-family: 'Inter', sans-serif; font-weight: 600; }
-  .player-score { font-size: 52px; line-height: 1; color: var(--green); }
-  .score-side.opp .player-score { color: var(--red); }
-
-  .score-divider {
-    padding: 0 16px;
-    font-size: 36px; color: rgba(255,255,255,0.2);
-    display: flex; align-items: center;
-  }
-
-  #serving-label {
-    position: absolute; top: 110px; left: 50%; transform: translateX(-50%);
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 15px; letter-spacing: 0.3em;
-    color: var(--accent);
-    opacity: 0; transition: opacity 0.3s;
-    text-transform: uppercase;
-  }
+  #menu-btn:hover { border-color:rgba(0,230,118,0.55);background:rgba(0,230,118,0.08); }
+  #menu-btn span { display:block;width:22px;height:2px;background:var(--green);border-radius:2px; }
 
   #controls-hint {
-    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-    display: flex; gap: 20px;
-    font-size: 12px; opacity: 0.4; letter-spacing: 0.08em;
+    position:absolute;bottom:18px;left:50%;transform:translateX(-50%);
+    display:flex;gap:14px;font-size:11px;opacity:0.32;letter-spacing:0.07em;
   }
-  .hint-key {
-    background: rgba(255,255,255,0.07);
-    border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 6px; padding: 4px 10px;
-  }
+  .hint-key { background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:5px;padding:3px 9px; }
 
-  /* ── Countdown ───────────────────────────────────── */
+  /* Countdown */
   #countdown-overlay {
-    position: fixed; inset: 0; z-index: 50;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    background: rgba(0,0,0,0.55);
-    pointer-events: none;
-    opacity: 0; transition: opacity 0.2s;
+    position:fixed;inset:0;z-index:50;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(0,0,0,0.5);pointer-events:none;
+    opacity:0;transition:opacity 0.18s;
   }
-  #countdown-overlay.visible { opacity: 1; }
+  #countdown-overlay.visible { opacity:1; }
   #countdown-num {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 180px; line-height: 1;
-    color: var(--green);
-    text-shadow: 0 0 80px rgba(0,230,118,0.6);
-    animation: popIn 0.35s cubic-bezier(0.36,0.07,0.19,0.97) both;
+    font-family:'Bebas Neue',sans-serif;font-size:170px;line-height:1;
+    color:var(--green);text-shadow:0 0 70px rgba(0,230,118,0.55);
+    animation:popIn 0.3s cubic-bezier(0.36,0.07,0.19,0.97) both;
   }
-  #countdown-label {
-    font-size: 16px; letter-spacing: 0.4em; opacity: 0.6;
-    margin-top: -10px; font-family: 'Inter', sans-serif; font-weight: 300;
-  }
-  @keyframes popIn {
-    0% { transform: scale(1.8); opacity: 0; }
-    100% { transform: scale(1); opacity: 1; }
+  #countdown-label { font-size:14px;letter-spacing:0.35em;opacity:0.5;margin-top:-8px;font-weight:300; }
+  @keyframes popIn { 0%{transform:scale(1.7);opacity:0}100%{transform:scale(1);opacity:1} }
+
+  /* Score flash */
+  #score-flash {
+    position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+    z-index:60;pointer-events:none;
+    font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:0.08em;opacity:0;
   }
 
-  /* ── Modals ──────────────────────────────────────── */
+  /* Modals */
   .modal-bg {
-    position: fixed; inset: 0; z-index: 100;
-    background: rgba(0,0,0,0.75);
-    backdrop-filter: blur(8px);
-    display: flex; align-items: center; justify-content: center;
+    position:fixed;inset:0;z-index:100;
+    background:rgba(0,0,0,0.72);backdrop-filter:blur(10px);
+    display:flex;align-items:center;justify-content:center;
   }
   .modal {
-    background: linear-gradient(160deg, #0d1f0e 0%, #071007 100%);
-    border: 1px solid rgba(0,230,118,0.3);
-    border-radius: 20px;
-    padding: 48px 56px;
-    text-align: center;
-    max-width: 480px; width: 90%;
-    box-shadow: 0 24px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,230,118,0.1);
-    animation: slideUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+    background:linear-gradient(155deg,#0d1f0e 0%,#060f06 100%);
+    border:1px solid rgba(0,230,118,0.28);border-radius:20px;
+    padding:44px 52px;text-align:center;max-width:460px;width:90%;
+    box-shadow:0 24px 80px rgba(0,0,0,0.85);
+    animation:slideUp 0.38s cubic-bezier(0.22,1,0.36,1) both;
   }
-  @keyframes slideUp {
-    from { transform: translateY(40px); opacity: 0; }
-    to   { transform: translateY(0); opacity: 1; }
-  }
-
+  @keyframes slideUp { from{transform:translateY(36px);opacity:0}to{transform:translateY(0);opacity:1} }
   .modal h1 {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 64px; letter-spacing: 0.05em;
-    line-height: 1;
-    background: linear-gradient(135deg, #00e676, #69f0ae);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    margin-bottom: 8px;
+    font-family:'Bebas Neue',sans-serif;font-size:60px;letter-spacing:0.05em;line-height:1;
+    background:linear-gradient(135deg,#00e676,#69f0ae);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px;
   }
-  .modal .tagline {
-    font-size: 13px; letter-spacing: 0.2em; opacity: 0.4;
-    font-weight: 300; margin-bottom: 36px; text-transform: uppercase;
-  }
+  .tagline { font-size:12px;letter-spacing:0.2em;opacity:0.38;font-weight:300;margin-bottom:32px;text-transform:uppercase; }
   .modal input {
-    width: 100%;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(0,230,118,0.25);
-    border-radius: 10px;
-    padding: 14px 18px;
-    font-size: 16px;
-    color: var(--text);
-    font-family: 'Inter', sans-serif;
-    outline: none;
-    margin-bottom: 16px;
-    transition: border-color 0.2s;
+    width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(0,230,118,0.22);
+    border-radius:10px;padding:13px 16px;font-size:15px;color:var(--text);
+    font-family:'Inter',sans-serif;outline:none;margin-bottom:14px;transition:border-color 0.2s;
   }
-  .modal input:focus { border-color: var(--green); }
-  .modal input::placeholder { opacity: 0.3; }
-
+  .modal input:focus { border-color:var(--green); }
+  .modal input::placeholder { opacity:0.28; }
   .btn {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 100%; padding: 15px 32px;
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 20px; letter-spacing: 0.15em;
-    border: none; border-radius: 10px; cursor: pointer;
-    transition: transform 0.15s, box-shadow 0.15s;
+    display:flex;align-items:center;justify-content:center;
+    width:100%;padding:14px 28px;
+    font-family:'Bebas Neue',sans-serif;font-size:19px;letter-spacing:0.14em;
+    border:none;border-radius:10px;cursor:pointer;
+    transition:transform 0.12s,box-shadow 0.12s;
   }
-  .btn:hover { transform: translateY(-2px); }
-  .btn:active { transform: translateY(0); }
-  .btn-primary {
-    background: linear-gradient(135deg, #00e676, #00b352);
-    color: #001a08;
-    box-shadow: 0 4px 24px rgba(0,230,118,0.35);
-  }
-  .btn-primary:hover { box-shadow: 0 6px 32px rgba(0,230,118,0.5); }
-  .btn-secondary {
-    background: rgba(255,255,255,0.07);
-    color: var(--text);
-    border: 1px solid rgba(255,255,255,0.12);
-    margin-top: 10px;
-  }
+  .btn:hover { transform:translateY(-2px); }
+  .btn:active { transform:translateY(0); }
+  .btn-primary { background:linear-gradient(135deg,#00e676,#00b352);color:#001508;box-shadow:0 4px 22px rgba(0,230,118,0.32); }
+  .btn-primary:hover { box-shadow:0 6px 30px rgba(0,230,118,0.48); }
+  .btn-secondary { background:rgba(255,255,255,0.06);color:var(--text);border:1px solid rgba(255,255,255,0.11);margin-top:9px; }
+  .btn-danger { background:rgba(255,82,82,0.1);color:#ff8a80;border:1px solid rgba(255,82,82,0.22);margin-top:9px; }
+  .modal-sub { font-size:12px;opacity:0.35;margin-top:18px;letter-spacing:0.04em; }
+  .modal-divider { height:1px;background:rgba(0,230,118,0.11);margin:18px 0; }
 
-  .modal-sub { font-size: 13px; opacity: 0.4; margin-top: 20px; letter-spacing: 0.05em; }
+  .spinner { width:46px;height:46px;border:3px solid rgba(0,230,118,0.13);border-top-color:var(--green);border-radius:50%;animation:spin 0.75s linear infinite;margin:0 auto 22px; }
+  @keyframes spin { to{transform:rotate(360deg)} }
 
-  #waiting-modal .spinner {
-    width: 48px; height: 48px;
-    border: 3px solid rgba(0,230,118,0.15);
-    border-top-color: var(--green);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin: 0 auto 24px;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  #gameover-modal .crown { font-size:52px;margin-bottom:6px; }
+  #gameover-modal h2 { font-family:'Bebas Neue',sans-serif;font-size:38px;letter-spacing:0.08em;color:var(--accent);margin-bottom:4px; }
+  #gameover-modal .fin { font-size:60px;font-family:'Bebas Neue',sans-serif;letter-spacing:0.14em;margin:10px 0 26px; }
 
-  #score-flash {
-    position: fixed; top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 60; pointer-events: none;
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 56px; letter-spacing: 0.1em;
-    opacity: 0;
-  }
-
-  /* Game over specific */
-  #gameover-modal .winner-crown {
-    font-size: 56px; margin-bottom: 8px;
-  }
-  #gameover-modal h2 {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 40px; letter-spacing: 0.08em;
-    color: var(--accent); margin-bottom: 4px;
-  }
-  #gameover-modal .final-score {
-    font-size: 64px; font-family: 'Bebas Neue', sans-serif;
-    letter-spacing: 0.15em; margin: 12px 0 28px;
-  }
+  /* Controls table in pause */
+  .ctrl-table { width:100%;text-align:left;font-size:13px;border-collapse:collapse; }
+  .ctrl-table td { padding:5px 8px;opacity:0.68; }
+  .ctrl-table td:first-child { color:var(--green);font-weight:600;opacity:1;width:90px; }
 </style>
 </head>
 <body>
-
-<!-- Three.js canvas -->
 <canvas id="canvas"></canvas>
 
-<!-- HUD -->
 <div id="hud">
   <div id="scoreboard">
     <div class="score-side me">
@@ -239,569 +145,427 @@
       <span class="player-name" id="name-opp">OPP</span>
     </div>
   </div>
-  <div id="serving-label">SERVING</div>
+  <div id="menu-btn" title="Menu (ESC)">
+    <span></span><span></span><span></span>
+  </div>
   <div id="controls-hint">
-    <span class="hint-key">MOUSE — Move paddle</span>
-    <span class="hint-key">WASD / ARROWS — Move paddle</span>
+    <span class="hint-key">MOUSE — move paddle</span>
+    <span class="hint-key">A / D  or  ← / → — move paddle</span>
+    <span class="hint-key">ESC — menu</span>
   </div>
 </div>
 
-<!-- Score flash -->
 <div id="score-flash"></div>
-
-<!-- Countdown overlay -->
 <div id="countdown-overlay">
   <div id="countdown-num">3</div>
   <div id="countdown-label">GET READY</div>
 </div>
 
-<!-- Landing Modal -->
+<!-- Landing -->
 <div class="modal-bg" id="landing-modal">
   <div class="modal">
     <h1>PADEL 3D</h1>
-    <p class="tagline">Online Multiplayer · Real Time</p>
-    <input type="text" id="name-input" placeholder="Enter your name" maxlength="16"/>
+    <p class="tagline">Online Multiplayer · Real Time · 3D</p>
+    <input type="text" id="name-input" placeholder="Your name" maxlength="16" autocomplete="off"/>
     <button class="btn btn-primary" id="play-btn">FIND MATCH</button>
     <p class="modal-sub">First to 7 points wins · Glass walls in play</p>
   </div>
 </div>
 
-<!-- Waiting Modal -->
+<!-- Waiting -->
 <div class="modal-bg" id="waiting-modal" style="display:none">
   <div class="modal">
     <div class="spinner"></div>
-    <h1 style="font-size:40px">FINDING MATCH</h1>
+    <h1 style="font-size:38px">FINDING MATCH</h1>
     <p class="tagline">Searching for opponent...</p>
-    <p class="modal-sub" id="waiting-sub">Share this link with a friend to play together</p>
+    <p class="modal-sub">Share this URL with a friend to play together</p>
     <button class="btn btn-secondary" id="cancel-btn">CANCEL</button>
   </div>
 </div>
 
-<!-- Game Over Modal -->
+<!-- Game Over -->
 <div class="modal-bg" id="gameover-modal" style="display:none">
   <div class="modal">
-    <div class="winner-crown" id="result-crown">🏆</div>
+    <div class="crown" id="result-crown">🏆</div>
     <h2 id="result-title">YOU WIN!</h2>
-    <div class="final-score" id="final-score">7 — 3</div>
+    <div class="fin" id="final-score">7 — 3</div>
     <button class="btn btn-primary" id="restart-btn">PLAY AGAIN</button>
-    <p class="modal-sub" id="restart-sub">Waiting for opponent...</p>
+    <p class="modal-sub" id="restart-sub"></p>
+    <button class="btn btn-secondary" id="quit-btn">QUIT TO MENU</button>
   </div>
 </div>
 
-<!-- Socket.io -->
+<!-- Pause / Menu -->
+<div class="modal-bg" id="pause-modal" style="display:none">
+  <div class="modal">
+    <h1>MENU</h1>
+    <p class="tagline">Game paused</p>
+    <div class="modal-divider"></div>
+    <table class="ctrl-table">
+      <tr><td>MOUSE</td><td>Move your paddle left / right</td></tr>
+      <tr><td>A / ←</td><td>Move paddle left</td></tr>
+      <tr><td>D / →</td><td>Move paddle right</td></tr>
+      <tr><td>ESC</td><td>Toggle this menu</td></tr>
+    </table>
+    <div class="modal-divider"></div>
+    <button class="btn btn-primary"    id="resume-btn">RESUME</button>
+    <button class="btn btn-danger"     id="leave-btn">LEAVE GAME</button>
+  </div>
+</div>
+
 <script src="/socket.io/socket.io.js"></script>
-<!-- Three.js -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-
 <script>
-// ═══════════════════════════════════════════════════════════
-//  CONFIG
-// ═══════════════════════════════════════════════════════════
-const COURT_W = 10, COURT_H = 20, WALL_H = 4;
-const NET_H = 0.92;
-const BALL_R = 0.15;
+'use strict';
+// ── Constants ──────────────────────────────────────────
+const CW=10, CH=20, WH=4, NET_H=0.92;
 
-// ═══════════════════════════════════════════════════════════
-//  THREE.JS SCENE
-// ═══════════════════════════════════════════════════════════
-const canvas = document.getElementById('canvas');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.1;
+// ── Renderer ───────────────────────────────────────────
+const canvas=document.getElementById('canvas');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.1;
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x080d08);
-scene.fog = new THREE.Fog(0x080d08, 25, 60);
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x080d08);
+scene.fog=new THREE.Fog(0x080d08,28,65);
 
-// Camera — positioned behind player's side
-const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 200);
-let mySide = 1; // updated after match found
-function positionCamera() {
-  if (mySide === 1) {
-    camera.position.set(0, 8, 16);
-    camera.lookAt(0, 1, 0);
-  } else {
-    camera.position.set(0, 8, -16);
-    camera.lookAt(0, 1, 0);
-  }
+const camera=new THREE.PerspectiveCamera(56,1,0.1,200);
+let mySide=1;
+function setCam(){
+  camera.position.set(0, 8.5, mySide===1?16.5:-16.5);
+  camera.lookAt(0,1.2,0);
 }
-positionCamera();
+setCam();
 
-// ── Lights ──────────────────────────────────────────────────
-const ambient = new THREE.AmbientLight(0x223322, 1.2);
-scene.add(ambient);
+// Lights
+scene.add(new THREE.AmbientLight(0x223322,1.3));
+const sun=new THREE.DirectionalLight(0xffffff,1.7);
+sun.position.set(5,18,8);sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left=-15;sun.shadow.camera.right=15;
+sun.shadow.camera.top=26;sun.shadow.camera.bottom=-26;
+sun.shadow.bias=-0.001;scene.add(sun);
+const fill=new THREE.DirectionalLight(0x88ffaa,0.45);
+fill.position.set(-8,5,-10);scene.add(fill);
+[-4.5,4.5].forEach(x=>[-(CH/2-1.5),CH/2-1.5].forEach(z=>{
+  const sp=new THREE.SpotLight(0xfff4cc,1.1,38,Math.PI/5.5,0.4);
+  sp.position.set(x,13,z);sp.target.position.set(0,0,z>0?3:-3);
+  scene.add(sp,sp.target);
+}));
 
-const sun = new THREE.DirectionalLight(0xffffff, 1.8);
-sun.position.set(5, 18, 8);
-sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.camera.near = 0.5;
-sun.shadow.camera.far = 80;
-sun.shadow.camera.left = -15; sun.shadow.camera.right = 15;
-sun.shadow.camera.top = 25; sun.shadow.camera.bottom = -25;
-sun.shadow.bias = -0.001;
-scene.add(sun);
-
-const fill = new THREE.DirectionalLight(0x88ffaa, 0.5);
-fill.position.set(-8, 5, -10);
-scene.add(fill);
-
-// Stadium lights
-[-4, 4].forEach(x => {
-  [-(COURT_H/2 - 1), (COURT_H/2 - 1)].forEach(z => {
-    const spot = new THREE.SpotLight(0xfff5cc, 1.2, 35, Math.PI/5, 0.4);
-    spot.position.set(x, 12, z);
-    spot.target.position.set(0, 0, z > 0 ? 4 : -4);
-    spot.castShadow = false;
-    scene.add(spot, spot.target);
-  });
-});
-
-// ── Court Floor ─────────────────────────────────────────────
-const floorGeo = new THREE.PlaneGeometry(COURT_W, COURT_H, 20, 40);
-const floorMat = new THREE.MeshLambertMaterial({ color: 0x1a5c1a });
-const floor = new THREE.Mesh(floorGeo, floorMat);
-floor.rotation.x = -Math.PI / 2;
-floor.receiveShadow = true;
-scene.add(floor);
+// Floor
+const flr=new THREE.Mesh(
+  new THREE.PlaneGeometry(CW,CH),
+  new THREE.MeshLambertMaterial({color:0x1a5c1a})
+);
+flr.rotation.x=-Math.PI/2;flr.receiveShadow=true;scene.add(flr);
 
 // Court lines
-function addLine(x1,z1,x2,z2, color=0xffffff, opacity=0.5) {
-  const pts = [new THREE.Vector3(x1,0.01,z1), new THREE.Vector3(x2,0.01,z2)];
-  const geo = new THREE.BufferGeometry().setFromPoints(pts);
-  const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity });
-  scene.add(new THREE.Line(geo, mat));
+function ln(x1,z1,x2,z2,op=0.42){
+  const g=new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(x1,0.012,z1),new THREE.Vector3(x2,0.012,z2)
+  ]);
+  scene.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:op})));
 }
-// Boundary
-addLine(-COURT_W/2, -COURT_H/2,  COURT_W/2, -COURT_H/2);
-addLine(-COURT_W/2,  COURT_H/2,  COURT_W/2,  COURT_H/2);
-addLine(-COURT_W/2, -COURT_H/2, -COURT_W/2,  COURT_H/2);
-addLine( COURT_W/2, -COURT_H/2,  COURT_W/2,  COURT_H/2);
-// Center line
-addLine(0, -COURT_H/2, 0, COURT_H/2, 0xffffff, 0.25);
-// Service boxes
-addLine(-COURT_W/2, -COURT_H/4,  COURT_W/2, -COURT_H/4, 0xffffff, 0.3);
-addLine(-COURT_W/2,  COURT_H/4,  COURT_W/2,  COURT_H/4, 0xffffff, 0.3);
+ln(-CW/2,-CH/2,CW/2,-CH/2);ln(-CW/2,CH/2,CW/2,CH/2);
+ln(-CW/2,-CH/2,-CW/2,CH/2);ln(CW/2,-CH/2,CW/2,CH/2);
+ln(-CW/2,0,CW/2,0,0.18);
+ln(-CW/2,-CH/4,CW/2,-CH/4,0.25);ln(-CW/2,CH/4,CW/2,CH/4,0.25);
+ln(0,-CH/2,0,CH/2,0.16);
 
-// ── Walls ───────────────────────────────────────────────────
-const glassMat = new THREE.MeshPhongMaterial({
-  color: 0x88ccff,
-  transparent: true, opacity: 0.13,
-  side: THREE.DoubleSide,
-  shininess: 120,
-  specular: 0x88aaff,
-  depthWrite: false
+// Glass walls
+const gMat=new THREE.MeshPhongMaterial({color:0x88ccff,transparent:true,opacity:0.11,side:THREE.DoubleSide,shininess:110,specular:0x88aaff,depthWrite:false});
+function gWall(w,h,x,z,ry){
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),gMat);
+  m.position.set(x,h/2,z);m.rotation.y=ry;scene.add(m);
+  const e=new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.PlaneGeometry(w,h)),
+    new THREE.LineBasicMaterial({color:0x88ddaa,transparent:true,opacity:0.45})
+  );
+  e.position.set(x,h/2,z);e.rotation.y=ry;scene.add(e);
+}
+gWall(CW,WH,0,CH/2,0);gWall(CW,WH,0,-CH/2,0);
+gWall(CH,WH,CW/2,0,Math.PI/2);gWall(CH,WH,-CW/2,0,Math.PI/2);
+
+// Rails
+const rMat=new THREE.MeshLambertMaterial({color:0x88aaaa});
+function rail(len,x,z,ry){
+  const m=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,len,6),rMat);
+  m.position.set(x,WH,z);m.rotation.y=ry;scene.add(m);
+}
+rail(CW+0.1,0,CH/2,0);rail(CW+0.1,0,-CH/2,0);
+rail(CH+0.1,CW/2,0,Math.PI/2);rail(CH+0.1,-CW/2,0,Math.PI/2);
+
+// Net
+const pMat=new THREE.MeshLambertMaterial({color:0xbbbbbb});
+[-CW/2,CW/2].forEach(x=>{
+  const m=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,NET_H,8),pMat);
+  m.position.set(x,NET_H/2,0);scene.add(m);
 });
-const glassFrameMat = new THREE.MeshLambertMaterial({ color: 0xaaccaa });
+const netMesh=new THREE.Mesh(
+  new THREE.PlaneGeometry(CW,NET_H),
+  new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.12,side:THREE.DoubleSide,depthWrite:false})
+);
+netMesh.position.set(0,NET_H/2,0);scene.add(netMesh);
+scene.add(Object.assign(new THREE.Mesh(
+  new THREE.BoxGeometry(CW+0.1,0.06,0.04),
+  new THREE.MeshLambertMaterial({color:0xeeeeee})
+),{position:{x:0,y:NET_H,z:0}}));
+const nlM=new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:0.15});
+for(let i=0;i<=22;i++){const x=-CW/2+i*(CW/22);scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x,0.01,0),new THREE.Vector3(x,NET_H,0)]),nlM));}
+for(let j=0;j<=9;j++){const y=j*(NET_H/9);scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-CW/2,y,0),new THREE.Vector3(CW/2,y,0)]),nlM));}
 
-function addGlassWall(w, h, x, z, ry) {
-  // Glass panel
-  const geo = new THREE.PlaneGeometry(w, h);
-  const mesh = new THREE.Mesh(geo, glassMat);
-  mesh.position.set(x, h/2, z);
-  mesh.rotation.y = ry;
-  scene.add(mesh);
-  // Frame
-  const frameGeo = new THREE.EdgesGeometry(geo);
-  const frameMat = new THREE.LineBasicMaterial({ color: 0x99ddaa, transparent: true, opacity: 0.6 });
-  const frame = new THREE.LineSegments(frameGeo, frameMat);
-  frame.position.set(x, h/2, z);
-  frame.rotation.y = ry;
-  scene.add(frame);
+// Paddles
+function mkPaddle(col){
+  const g=new THREE.Group();
+  const b=new THREE.Mesh(new THREE.BoxGeometry(1.2,1.4,0.1),new THREE.MeshPhongMaterial({color:col,shininess:80}));
+  b.castShadow=true;g.add(b);
+  const sm=new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:0.33});
+  for(let i=-4;i<=4;i++){const x=i*0.12;g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x,-0.57,0.06),new THREE.Vector3(x,0.57,0.06)]),sm));}
+  for(let j=-5;j<=5;j++){const y=j*0.11;g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-0.52,y,0.06),new THREE.Vector3(0.52,y,0.06)]),sm));}
+  const h=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.5,8),new THREE.MeshPhongMaterial({color:0x1a1a1a}));
+  h.position.set(0,-0.92,0);h.castShadow=true;g.add(h);
+  return g;
 }
+const myPaddle=mkPaddle(0x00e676);myPaddle.position.set(0,0.9,CH/2-1);scene.add(myPaddle);
+const oppPaddle=mkPaddle(0xff5252);oppPaddle.position.set(0,0.9,-(CH/2-1));scene.add(oppPaddle);
 
-// Back walls
-addGlassWall(COURT_W, WALL_H, 0, COURT_H/2, 0);
-addGlassWall(COURT_W, WALL_H, 0, -COURT_H/2, 0);
-// Side walls
-addGlassWall(COURT_H, WALL_H, COURT_W/2, 0, Math.PI/2);
-addGlassWall(COURT_H, WALL_H, -COURT_W/2, 0, Math.PI/2);
+// Ball
+const ballMesh=new THREE.Mesh(
+  new THREE.SphereGeometry(0.15,24,24),
+  new THREE.MeshPhongMaterial({color:0xffff55,shininess:130,specular:0xffffff})
+);
+ballMesh.castShadow=true;ballMesh.position.set(0,1.5,0);scene.add(ballMesh);
 
-// Wall tops (metal rail)
-const railMat = new THREE.MeshLambertMaterial({ color: 0x88aaaa });
-function rail(w, x, z, ry) {
-  const g = new THREE.CylinderGeometry(0.04, 0.04, w, 6);
-  const m = new THREE.Mesh(g, railMat);
-  m.position.set(x, WALL_H, z);
-  m.rotation.y = ry;
-  scene.add(m);
-}
-rail(COURT_W + 0.1, 0, COURT_H/2, 0);
-rail(COURT_W + 0.1, 0, -COURT_H/2, 0);
-rail(COURT_H + 0.1, COURT_W/2, 0, Math.PI/2);
-rail(COURT_H + 0.1, -COURT_W/2, 0, Math.PI/2);
+const shadowMat=new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:0.3,depthWrite:false});
+const ballShadow=new THREE.Mesh(new THREE.CircleGeometry(0.18,16),shadowMat);
+ballShadow.rotation.x=-Math.PI/2;ballShadow.position.y=0.006;scene.add(ballShadow);
 
-// ── Net ─────────────────────────────────────────────────────
-const netPostMat = new THREE.MeshLambertMaterial({ color: 0xbbbbbb });
-function netPost(x) {
-  const g = new THREE.CylinderGeometry(0.05, 0.05, NET_H, 8);
-  const m = new THREE.Mesh(g, netPostMat);
-  m.position.set(x, NET_H/2, 0);
-  scene.add(m);
-}
-netPost(-COURT_W/2);
-netPost(COURT_W/2);
+const TRAIL=14;
+const trailPts=Array.from({length:TRAIL},()=>new THREE.Vector3());
+const trailGeo=new THREE.BufferGeometry().setFromPoints(trailPts);
+scene.add(new THREE.Line(trailGeo,new THREE.LineBasicMaterial({color:0xffff99,transparent:true,opacity:0.36})));
 
-// Net band
-const netGeo = new THREE.PlaneGeometry(COURT_W, NET_H);
-const netMat = new THREE.MeshBasicMaterial({
-  color: 0xffffff, transparent: true, opacity: 0.15,
-  side: THREE.DoubleSide, wireframe: false
-});
-const net = new THREE.Mesh(netGeo, netMat);
-net.position.set(0, NET_H/2, 0);
-scene.add(net);
-
-// Net top band
-const bandGeo = new THREE.BoxGeometry(COURT_W + 0.1, 0.06, 0.04);
-const bandMat = new THREE.MeshLambertMaterial({ color: 0xeeeeee });
-const band = new THREE.Mesh(bandGeo, bandMat);
-band.position.set(0, NET_H, 0);
-scene.add(band);
-
-// Net grid lines
-for (let i = 0; i <= 20; i++) {
-  const x = -COURT_W/2 + i * (COURT_W/20);
-  addLine(x, 0, x, 0, 0xffffff, 0); // dummy, we'll do proper net
-}
-// Actual net lines
-const netLineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.18 });
-for (let i = 0; i <= 20; i++) {
-  const x = -COURT_W/2 + i*(COURT_W/20);
-  const pts = [new THREE.Vector3(x, 0.01, 0), new THREE.Vector3(x, NET_H, 0)];
-  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), netLineMat));
-}
-for (let j = 0; j <= 8; j++) {
-  const y = j * (NET_H/8);
-  const pts = [new THREE.Vector3(-COURT_W/2, y, 0), new THREE.Vector3(COURT_W/2, y, 0)];
-  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), netLineMat));
-}
-
-// ── Paddles ─────────────────────────────────────────────────
-function createPaddle(color) {
-  const group = new THREE.Group();
-  // Frame
-  const frameGeo = new THREE.BoxGeometry(1.2, 1.4, 0.1);
-  const frameMat = new THREE.MeshPhongMaterial({ color, shininess: 80 });
-  const frame = new THREE.Mesh(frameGeo, frameMat);
-  frame.castShadow = true;
-  group.add(frame);
-  // Strings grid
-  const strMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
-  for (let i = -4; i <= 4; i++) {
-    const x = i * 0.13;
-    const pts = [new THREE.Vector3(x, -0.6, 0.06), new THREE.Vector3(x, 0.6, 0.06)];
-    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), strMat));
-  }
-  for (let j = -5; j <= 5; j++) {
-    const y = j * 0.12;
-    const pts = [new THREE.Vector3(-0.55, y, 0.06), new THREE.Vector3(0.55, y, 0.06)];
-    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), strMat));
-  }
-  // Handle
-  const hGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.55, 8);
-  const hMat = new THREE.MeshPhongMaterial({ color: 0x222222 });
-  const handle = new THREE.Mesh(hGeo, hMat);
-  handle.position.set(0, -0.95, 0);
-  handle.castShadow = true;
-  group.add(handle);
-  return group;
-}
-
-const myPaddle = createPaddle(0x00e676);
-myPaddle.position.set(0, 0.9, COURT_H/2 - 1);
-scene.add(myPaddle);
-
-const oppPaddle = createPaddle(0xff5252);
-oppPaddle.position.set(0, 0.9, -(COURT_H/2 - 1));
-scene.add(oppPaddle);
-
-// ── Ball ────────────────────────────────────────────────────
-const ballGeo = new THREE.SphereGeometry(BALL_R, 24, 24);
-const ballMat = new THREE.MeshPhongMaterial({ color: 0xffff66, shininess: 120, specular: 0xffffff });
-const ball = new THREE.Mesh(ballGeo, ballMat);
-ball.castShadow = true;
-ball.position.set(0, 1.5, 0);
-scene.add(ball);
-
-// Ball shadow (projected circle on floor)
-const shadowGeo = new THREE.CircleGeometry(0.18, 16);
-const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false });
-const ballShadow = new THREE.Mesh(shadowGeo, shadowMat);
-ballShadow.rotation.x = -Math.PI/2;
-ballShadow.position.y = 0.005;
-scene.add(ballShadow);
-
-// Ball trail
-const TRAIL_LEN = 12;
-const trailPts = [];
-for (let i = 0; i < TRAIL_LEN; i++) trailPts.push(new THREE.Vector3());
-const trailGeo = new THREE.BufferGeometry().setFromPoints(trailPts);
-const trailMat = new THREE.LineBasicMaterial({ color: 0xffff99, transparent: true, opacity: 0.4, linewidth: 2 });
-const trail = new THREE.Line(trailGeo, trailMat);
-scene.add(trail);
-
-// ── Stadium / Environment ────────────────────────────────────
-// Bleachers (simple boxes)
-const bleacherMat = new THREE.MeshLambertMaterial({ color: 0x1a2a1a });
-function addBleacher(x, z, w, d) {
-  const g = new THREE.BoxGeometry(w, 3, d);
-  const m = new THREE.Mesh(g, bleacherMat);
-  m.position.set(x, 1.5, z);
-  scene.add(m);
-}
-addBleacher(0,  COURT_H/2 + 4, COURT_W + 8, 5);
-addBleacher(0, -COURT_H/2 - 4, COURT_W + 8, 5);
-addBleacher( COURT_W/2 + 4, 0, 4, COURT_H + 4);
-addBleacher(-COURT_W/2 - 4, 0, 4, COURT_H + 4);
-
-// ── Resize Handler ───────────────────────────────────────────
-function onResize() {
-  const w = window.innerWidth, h = window.innerHeight;
-  renderer.setSize(w, h);
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
-}
-window.addEventListener('resize', onResize);
-onResize();
-
-// ═══════════════════════════════════════════════════════════
-//  INPUT
-// ═══════════════════════════════════════════════════════════
-const keys = {};
-document.addEventListener('keydown', e => keys[e.code] = true);
-document.addEventListener('keyup',   e => keys[e.code] = false);
-
-let mouseX = 0;
-const HW = COURT_W/2 - 0.7;
-document.addEventListener('mousemove', e => {
-  mouseX = ((e.clientX / window.innerWidth) * 2 - 1) * HW;
-});
-document.addEventListener('touchmove', e => {
-  e.preventDefault();
-  const t = e.touches[0];
-  mouseX = ((t.clientX / window.innerWidth) * 2 - 1) * HW;
-}, { passive: false });
-
-// ═══════════════════════════════════════════════════════════
-//  SOCKET.IO
-// ═══════════════════════════════════════════════════════════
-const socket = io();
-let myId = null;
-let myPaddleData = { x: 0, z: COURT_H/2 - 1 };
-let oppPaddleData = { x: 0, z: -(COURT_H/2 - 1) };
-let ballData = { x: 0, y: 1.5, z: 0 };
-let inGame = false;
-let myName = 'Player';
-let oppName = 'Opponent';
-
-// Lerp targets
-let ballTarget = { x: 0, y: 1.5, z: 0 };
-
-socket.on('connect', () => { myId = socket.id; });
-
-socket.on('matchFound', (data) => {
-  hide('landing-modal'); hide('waiting-modal');
-  const me = data.players.find(p => p.id === myId);
-  const opp = data.players.find(p => p.id !== myId);
-  mySide = me.side;
-  myName = me.name;
-  oppName = opp.name;
-
-  document.getElementById('name-me').textContent = myName.toUpperCase();
-  document.getElementById('name-opp').textContent = oppName.toUpperCase();
-
-  positionCamera();
-  inGame = true;
-
-  if (mySide === 1) {
-    myPaddleData.z = COURT_H/2 - 1;
-    oppPaddleData.z = -(COURT_H/2 - 1);
-  } else {
-    myPaddleData.z = -(COURT_H/2 - 1);
-    oppPaddleData.z = COURT_H/2 - 1;
-  }
-  myPaddle.position.set(myPaddleData.x, 0.9, myPaddleData.z);
-  oppPaddle.position.set(oppPaddleData.x, 0.9, oppPaddleData.z);
+// Bleachers
+const blMat=new THREE.MeshLambertMaterial({color:0x182818});
+[[0,CH/2+4,CW+9,5],[0,-(CH/2+4),CW+9,5],[CW/2+4,0,4,CH+5],[-(CW/2+4),0,4,CH+5]].forEach(([x,z,w,d])=>{
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,3,d),blMat);m.position.set(x,1.5,z);scene.add(m);
 });
 
-socket.on('waiting', () => {
-  hide('landing-modal');
-  show('waiting-modal');
+function resize(){renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();}
+addEventListener('resize',resize);resize();
+
+// ── INPUT (fixed) ──────────────────────────────────────
+const keys={};
+addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Escape'&&inGame)togglePause();});
+addEventListener('keyup',  e=>keys[e.code]=false);
+
+const PLIMIT=CW/2-0.7;  // paddle X boundary
+let mouseX=0;           // desired paddle X from mouse (world units)
+let kbX=0;              // desired paddle X from keyboard
+let lastMX=null;
+
+// Mouse: use movementX (relative delta) for precision
+addEventListener('mousemove',e=>{
+  if(!inGame||paused) return;
+  const delta = e.movementX ?? (lastMX!==null ? e.clientX-lastMX : 0);
+  lastMX = e.clientX;
+  // Sensitivity: tune so full court width ≈ ~600px of mouse travel
+  mouseX += delta * 0.016;
+  mouseX = Math.max(-PLIMIT, Math.min(PLIMIT, mouseX));
 });
 
-socket.on('countdown', (n) => {
-  if (n <= 0) {
-    document.getElementById('countdown-overlay').classList.remove('visible');
-  } else {
-    const overlay = document.getElementById('countdown-overlay');
-    overlay.classList.add('visible');
-    const numEl = document.getElementById('countdown-num');
-    numEl.style.animation = 'none';
-    numEl.textContent = n;
-    void numEl.offsetWidth;
-    numEl.style.animation = 'popIn 0.35s cubic-bezier(0.36,0.07,0.19,0.97) both';
-  }
+// Touch (swipe)
+let lastTX=null;
+addEventListener('touchstart',e=>{lastTX=e.touches[0].clientX;},{passive:true});
+addEventListener('touchmove',e=>{
+  if(!inGame||paused) return;
+  const dx=e.touches[0].clientX-(lastTX??e.touches[0].clientX);
+  lastTX=e.touches[0].clientX;
+  mouseX+=dx*0.022;
+  mouseX=Math.max(-PLIMIT,Math.min(PLIMIT,mouseX));
+},{passive:true});
+
+// ── SOCKET ─────────────────────────────────────────────
+const socket=io();
+let myId=null,inGame=false,paused=false;
+let myName='Player',oppName='Opponent';
+let myPX=0,myPZ=CH/2-1;   // my paddle world position
+let opX=0,opZ=-(CH/2-1);   // opponent
+let ballTarget={x:0,y:1.5,z:0};
+let txTimer=0;
+
+socket.on('connect',()=>myId=socket.id);
+
+socket.on('matchFound',data=>{
+  hide('landing-modal');hide('waiting-modal');
+  const me=data.players.find(p=>p.id===myId);
+  const op=data.players.find(p=>p.id!==myId);
+  mySide=me.side; myName=me.name; oppName=op.name;
+  document.getElementById('name-me').textContent=myName.toUpperCase();
+  document.getElementById('name-opp').textContent=oppName.toUpperCase();
+  // Set paddle positions based on side
+  myPZ  = mySide===1 ?  CH/2-1 : -(CH/2-1);
+  opZ   = mySide===1 ? -(CH/2-1):  CH/2-1;
+  myPX=0;opX=0;mouseX=0;kbX=0;
+  myPaddle.position.set(0,0.9,myPZ);
+  oppPaddle.position.set(0,0.9,opZ);
+  // Paddle faces inward
+  myPaddle.rotation.y  = mySide===1 ? 0 : Math.PI;
+  oppPaddle.rotation.y = mySide===1 ? Math.PI : 0;
+  setCam();
+  inGame=true;
 });
 
-socket.on('gameState', (data) => {
-  ballTarget = data.ball;
-  const me = data.players.find(p => p.id === myId);
-  const opp = data.players.find(p => p.id !== myId);
-  if (opp) {
-    oppPaddleData.x = opp.x;
-    oppPaddleData.z = opp.z;
-  }
+socket.on('waiting',()=>{hide('landing-modal');show('waiting-modal');});
+
+socket.on('countdown',n=>{
+  const ov=document.getElementById('countdown-overlay');
+  if(n<=0){ov.classList.remove('visible');return;}
+  ov.classList.add('visible');
+  const el=document.getElementById('countdown-num');
+  el.style.animation='none';el.textContent=n;
+  void el.offsetWidth;
+  el.style.animation='popIn 0.3s cubic-bezier(0.36,0.07,0.19,0.97) both';
 });
 
-socket.on('scored', (data) => {
-  const me = data.players.find(p => p.id === myId);
-  const opp = data.players.find(p => p.id !== myId);
-  if (me) document.getElementById('score-me').textContent = me.score;
-  if (opp) document.getElementById('score-opp').textContent = opp.score;
-
-  const flash = document.getElementById('score-flash');
-  const iMe = data.scorer === myName;
-  flash.textContent = iMe ? '🎾 POINT!' : '⚡ OPP SCORES';
-  flash.style.color = iMe ? '#00e676' : '#ff5252';
-  flash.style.opacity = '1';
-  flash.style.transform = 'translate(-50%, -50%) scale(1.1)';
-  flash.style.transition = 'none';
-  setTimeout(() => {
-    flash.style.transition = 'opacity 0.6s, transform 0.6s';
-    flash.style.opacity = '0';
-    flash.style.transform = 'translate(-50%, -60%) scale(0.8)';
-  }, 800);
+socket.on('gameState',data=>{
+  ballTarget=data.ball;
+  const op=data.players.find(p=>p.id!==myId);
+  if(op){opX=op.x;opZ=op.z;}
 });
 
-socket.on('gameover', (data) => {
-  inGame = false;
-  const myScore = parseInt(document.getElementById('score-me').textContent);
-  const oppScore = parseInt(document.getElementById('score-opp').textContent);
-  const iWon = data.winner === myName;
-  document.getElementById('result-crown').textContent = iWon ? '🏆' : '😔';
-  document.getElementById('result-title').textContent = iWon ? 'YOU WIN!' : 'YOU LOST';
-  document.getElementById('result-title').style.color = iWon ? 'var(--accent)' : 'var(--red)';
-  document.getElementById('final-score').textContent = `${myScore} — ${oppScore}`;
-  document.getElementById('restart-sub').textContent = 'Waiting for both players...';
+socket.on('scored',data=>{
+  const me=data.players.find(p=>p.id===myId);
+  const op=data.players.find(p=>p.id!==myId);
+  if(me) document.getElementById('score-me').textContent=me.score;
+  if(op) document.getElementById('score-opp').textContent=op.score;
+  const fl=document.getElementById('score-flash');
+  const iMe=data.scorer===myName;
+  fl.textContent=iMe?'🎾 POINT!':'⚡ OPP SCORES';
+  fl.style.color=iMe?'#00e676':'#ff5252';
+  fl.style.opacity='1';fl.style.transition='none';
+  fl.style.transform='translate(-50%,-50%) scale(1.08)';
+  setTimeout(()=>{fl.style.transition='opacity 0.55s,transform 0.55s';fl.style.opacity='0';fl.style.transform='translate(-50%,-60%) scale(0.82)';},750);
+});
+
+socket.on('gameover',data=>{
+  inGame=false;paused=false;
+  const ms=parseInt(document.getElementById('score-me').textContent);
+  const os=parseInt(document.getElementById('score-opp').textContent);
+  const won=data.winner===myName;
+  document.getElementById('result-crown').textContent=won?'🏆':'😔';
+  document.getElementById('result-title').textContent=won?'YOU WIN!':'YOU LOST';
+  document.getElementById('result-title').style.color=won?'var(--accent)':'var(--red)';
+  document.getElementById('final-score').textContent=`${ms} — ${os}`;
+  document.getElementById('restart-sub').textContent='';
+  document.getElementById('restart-btn').style.display='flex';
   show('gameover-modal');
 });
 
-socket.on('waitingForRestart', (data) => {
-  document.getElementById('restart-sub').textContent = `${data.name} wants to play again...`;
+socket.on('waitingForRestart',d=>document.getElementById('restart-sub').textContent=`${d.name} wants to play again...`);
+
+socket.on('gameRestarted',()=>{
+  hide('gameover-modal');
+  document.getElementById('score-me').textContent='0';
+  document.getElementById('score-opp').textContent='0';
+  mouseX=0;kbX=0;inGame=true;
 });
 
-socket.on('gameRestarted', () => {
-  hide('gameover-modal');
-  document.getElementById('score-me').textContent = '0';
-  document.getElementById('score-opp').textContent = '0';
-  inGame = true;
-});
-
-socket.on('opponentLeft', () => {
-  inGame = false;
-  hide('gameover-modal');
-  document.getElementById('result-crown').textContent = '👋';
-  document.getElementById('result-title').textContent = 'OPPONENT LEFT';
-  document.getElementById('result-title').style.color = 'var(--text)';
-  document.getElementById('final-score').textContent = '—';
-  document.getElementById('restart-btn').style.display = 'none';
+socket.on('opponentLeft',()=>{
+  inGame=false;
+  document.getElementById('result-crown').textContent='👋';
+  document.getElementById('result-title').textContent='OPPONENT LEFT';
+  document.getElementById('result-title').style.color='var(--text)';
+  document.getElementById('final-score').textContent='—';
+  document.getElementById('restart-btn').style.display='none';
   show('gameover-modal');
 });
 
-// ── UI Controls ──────────────────────────────────────────────
-document.getElementById('play-btn').addEventListener('click', () => {
-  const name = document.getElementById('name-input').value.trim() || 'Player';
-  myName = name;
-  socket.emit('joinGame', { name });
+// UI helpers
+function show(id){document.getElementById(id).style.display='flex';}
+function hide(id){document.getElementById(id).style.display='none';}
+function togglePause(){
+  if(!inGame)return;
+  paused=!paused;
+  paused?show('pause-modal'):hide('pause-modal');
+}
+
+document.getElementById('play-btn').addEventListener('click',()=>{
+  const n=document.getElementById('name-input').value.trim()||'Player';
+  myName=n;socket.emit('joinGame',{name:n});
 });
-document.getElementById('name-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('play-btn').click();
-});
-document.getElementById('cancel-btn').addEventListener('click', () => {
-  location.reload();
-});
-document.getElementById('restart-btn').addEventListener('click', () => {
-  socket.emit('restartGame');
-  document.getElementById('restart-sub').textContent = 'Waiting for opponent...';
-});
+document.getElementById('name-input').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('play-btn').click();});
+document.getElementById('cancel-btn').addEventListener('click',()=>location.reload());
+document.getElementById('restart-btn').addEventListener('click',()=>{socket.emit('restartGame');document.getElementById('restart-sub').textContent='Waiting for opponent...';});
+document.getElementById('quit-btn').addEventListener('click',()=>location.reload());
+document.getElementById('menu-btn').addEventListener('click',togglePause);
+document.getElementById('resume-btn').addEventListener('click',togglePause);
+document.getElementById('leave-btn').addEventListener('click',()=>location.reload());
 
-function show(id) { document.getElementById(id).style.display = 'flex'; }
-function hide(id) { document.getElementById(id).style.display = 'none'; }
+// ── GAME LOOP ──────────────────────────────────────────
+const KB_SPD=10;  // units/sec for keyboard
+let lastT=performance.now();
 
-// ═══════════════════════════════════════════════════════════
-//  GAME LOOP
-// ═══════════════════════════════════════════════════════════
-const MOVE_SPEED = 0.18;
-const HW_PADDLE = COURT_W/2 - 0.7;
-const HD_PADDLE = 0.7;
-let sendThrottle = 0;
-
-// Trail history
-const trailHistory = [];
-for (let i = 0; i < TRAIL_LEN; i++) trailHistory.push({ x: 0, y: 1.5, z: 0 });
-
-let lastTime = performance.now();
-
-function animate() {
+function animate(){
   requestAnimationFrame(animate);
-  const now = performance.now();
-  const dt = Math.min((now - lastTime) / 1000, 0.05);
-  lastTime = now;
+  const now=performance.now();
+  const dt=Math.min((now-lastT)/1000,0.05);
+  lastT=now;
 
-  if (inGame) {
-    // Move my paddle
-    if (keys['ArrowLeft']  || keys['KeyA']) myPaddleData.x -= MOVE_SPEED;
-    if (keys['ArrowRight'] || keys['KeyD']) myPaddleData.x += MOVE_SPEED;
-    // Mouse X
-    myPaddleData.x += (mouseX - myPaddleData.x) * 0.15;
+  if(inGame&&!paused){
+    // Keyboard input (additive, dt-scaled)
+    if(keys['ArrowLeft'] ||keys['KeyA']) kbX-=KB_SPD*dt;
+    if(keys['ArrowRight']||keys['KeyD']) kbX+=KB_SPD*dt;
+    kbX=Math.max(-PLIMIT,Math.min(PLIMIT,kbX));
 
-    myPaddleData.x = Math.max(-HW_PADDLE, Math.min(HW_PADDLE, myPaddleData.x));
+    // Choose input: if keyboard active, use kbX and sync mouse to it
+    const kb=keys['ArrowLeft']||keys['KeyA']||keys['ArrowRight']||keys['KeyD'];
+    let target;
+    if(kb){ mouseX=kbX; target=kbX; }
+    else  { kbX=mouseX; target=mouseX; }
 
-    // Send paddle position
-    sendThrottle += dt;
-    if (sendThrottle >= 1/30) {
-      sendThrottle = 0;
-      socket.emit('paddleMove', { x: myPaddleData.x, z: myPaddleData.z });
-    }
+    // Smooth follow
+    myPX+=(target-myPX)*Math.min(1,20*dt);
+    myPX=Math.max(-PLIMIT,Math.min(PLIMIT,myPX));
 
-    // Update 3D paddle positions
-    myPaddle.position.x += (myPaddleData.x - myPaddle.position.x) * 0.35;
-    myPaddle.position.z = myPaddleData.z;
+    // Send paddle at 30 Hz
+    txTimer+=dt;
+    if(txTimer>=1/30){txTimer=0;socket.emit('paddleMove',{x:myPX,z:myPZ});}
 
-    oppPaddle.position.x += (oppPaddleData.x - oppPaddle.position.x) * 0.25;
-    oppPaddle.position.z += (oppPaddleData.z - oppPaddle.position.z) * 0.25;
+    // Update 3D paddle
+    myPaddle.position.x=myPX;
+    myPaddle.position.z=myPZ;
+
+    oppPaddle.position.x+=(opX-oppPaddle.position.x)*Math.min(1,16*dt);
+    oppPaddle.position.z+=(opZ-oppPaddle.position.z)*Math.min(1,16*dt);
 
     // Lerp ball
-    ball.position.x += (ballTarget.x - ball.position.x) * 0.35;
-    ball.position.y += (ballTarget.y - ball.position.y) * 0.35;
-    ball.position.z += (ballTarget.z - ball.position.z) * 0.35;
-    ball.rotation.x += (ballTarget.z - ball.position.z) * 0.5;
-    ball.rotation.z -= (ballTarget.x - ball.position.x) * 0.5;
+    const lf=Math.min(1,22*dt);
+    ballMesh.position.x+=(ballTarget.x-ballMesh.position.x)*lf;
+    ballMesh.position.y+=(ballTarget.y-ballMesh.position.y)*lf;
+    ballMesh.position.z+=(ballTarget.z-ballMesh.position.z)*lf;
+    ballMesh.rotation.x+=(ballTarget.z-ballMesh.position.z)*0.4;
+    ballMesh.rotation.z-=(ballTarget.x-ballMesh.position.x)*0.4;
 
-    // Ball shadow
-    ballShadow.position.x = ball.position.x;
-    ballShadow.position.z = ball.position.z;
-    const shadowScale = Math.max(0.1, 1 - ball.position.y * 0.08);
-    ballShadow.scale.set(shadowScale, shadowScale, 1);
-    shadowMat.opacity = Math.max(0, 0.4 - ball.position.y * 0.025);
+    // Shadow
+    ballShadow.position.x=ballMesh.position.x;
+    ballShadow.position.z=ballMesh.position.z;
+    const ss=Math.max(0.05,1-ballMesh.position.y*0.09);
+    ballShadow.scale.set(ss,ss,1);
+    shadowMat.opacity=Math.max(0,0.32-ballMesh.position.y*0.02);
 
     // Trail
-    trailHistory.push({ x: ball.position.x, y: ball.position.y, z: ball.position.z });
-    if (trailHistory.length > TRAIL_LEN) trailHistory.shift();
-    const pos = trailGeo.attributes.position;
-    for (let i = 0; i < TRAIL_LEN; i++) {
-      const t = trailHistory[i] || { x: 0, y: 0, z: 0 };
-      pos.setXYZ(i, t.x, t.y, t.z);
-    }
-    pos.needsUpdate = true;
-    trailGeo.setFromPoints(trailHistory.map(t => new THREE.Vector3(t.x, t.y, t.z)));
+    for(let i=0;i<TRAIL-1;i++) trailPts[i].copy(trailPts[i+1]);
+    trailPts[TRAIL-1].set(ballMesh.position.x,ballMesh.position.y,ballMesh.position.z);
+    trailGeo.setFromPoints(trailPts);
   }
 
-  renderer.render(scene, camera);
+  renderer.render(scene,camera);
 }
 animate();
 </script>

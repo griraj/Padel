@@ -1,18 +1,15 @@
 {
-  "name": "padel-online",
+  "name": "padel-online-3d",
   "version": "1.0.0",
-  "description": "Online multiplayer padel game",
-  "main": "server.js",
+  "description": "Online multiplayer 3D padel game — C++ server",
+  "main": "start.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start": "node start.js",
+    "dev": "node start.js"
   },
   "dependencies": {
     "express": "^4.18.2",
     "socket.io": "^4.7.2"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.1"
   },
   "engines": {
     "node": ">=18.0.0"
