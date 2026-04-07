@@ -1,15 +1,3 @@
-/*
- * Padel 3D — C++ Game Server
- * Uses Boost.Beast (HTTP + WebSocket) and Boost.Asio (async I/O)
- * Protocol: JSON over WebSocket (compatible with Socket.io-style events)
- *
- * Build:
- *   g++ -std=c++17 -O2 -o padel_server server.cpp \
- *       -lboost_system -lssl -lcrypto -lpthread
- *
- * Run:
- *   PORT=3000 ./padel_server
- */
 
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>

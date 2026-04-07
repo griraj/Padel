@@ -1,11 +1,4 @@
-/**
- * start.js  —  Build + launch the C++ padel server
- *
- * Render runs:  npm start  →  node start.js
- * This script:
- *   1. Compiles server.cpp  (only if binary is missing / stale)
- *   2. Spawns ./padel_server, forwarding PORT env and all stdio
- */
+
 
 const { execSync, spawn } = require('child_process');
 const fs   = require('fs');
@@ -14,7 +7,7 @@ const path = require('path');
 const SRC = path.join(__dirname, 'server.cpp');
 const BIN = path.join(__dirname, 'padel_server');
 
-// ── Compile ───────────────────────────────────────────────
+//compilation
 const needsBuild = !fs.existsSync(BIN) ||
   fs.statSync(SRC).mtimeMs > fs.statSync(BIN).mtimeMs;
 
@@ -37,7 +30,7 @@ if (needsBuild) {
   console.log('[build] Binary up to date, skipping compilation.');
 }
 
-// ── Launch ────────────────────────────────────────────────
+//launch
 console.log('[run] Starting padel_server...');
 const child = spawn('./padel_server', [], {
   cwd: __dirname,
