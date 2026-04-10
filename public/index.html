@@ -213,7 +213,7 @@
   </div>
 </div>
 
-<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 'use strict';
@@ -311,10 +311,8 @@ const netMesh=new THREE.Mesh(
   new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.12,side:THREE.DoubleSide,depthWrite:false})
 );
 netMesh.position.set(0,NET_H/2,0);scene.add(netMesh);
-scene.add(Object.assign(new THREE.Mesh(
-  new THREE.BoxGeometry(CW+0.1,0.06,0.04),
-  new THREE.MeshLambertMaterial({color:0xeeeeee})
-),{position:{x:0,y:NET_H,z:0}}));
+const netBand=new THREE.Mesh(new THREE.BoxGeometry(CW+0.1,0.06,0.04),new THREE.MeshLambertMaterial({color:0xeeeeee}));
+netBand.position.set(0,NET_H,0);scene.add(netBand);
 const nlM=new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:0.15});
 for(let i=0;i<=22;i++){const x=-CW/2+i*(CW/22);scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x,0.01,0),new THREE.Vector3(x,NET_H,0)]),nlM));}
 for(let j=0;j<=9;j++){const y=j*(NET_H/9);scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-CW/2,y,0),new THREE.Vector3(CW/2,y,0)]),nlM));}
@@ -391,17 +389,36 @@ addEventListener('touchmove',e=>{
 },{passive:true});
 
 // ── SOCKET ─────────────────────────────────────────────
-const socket=io();
+const socket=io({ transports: ["websocket", "polling"] });
 let myId=null,inGame=false,paused=false;
 let myName='Player',oppName='Opponent';
-let myPX=0,myPZ=CH/2-1;   // my paddle world position
-let opX=0,opZ=-(CH/2-1);   // opponent
+let myPX=0,myPZ=CH/2-1;
+let opX=0,opZ=-(CH/2-1);
 let ballTarget={x:0,y:1.5,z:0};
 let txTimer=0;
+let pendingJoin=null; // store name if clicked before connect
 
-socket.on('connect',()=>myId=socket.id);
+socket.on('connect',()=>{
+  console.log('[socket] connected', socket.id);
+  myId=socket.id;
+  // If user already clicked Find Match before socket was ready, send now
+  if(pendingJoin!==null){
+    console.log('[socket] sending pending joinGame:', pendingJoin);
+    socket.emit('joinGame',{name:pendingJoin});
+    pendingJoin=null;
+  }
+});
 
-socket.on('matchFound',data=>{
+socket.on('connect_error',(err)=>{
+  console.error('[socket] connection error:', err.message);
+});
+
+socket.on('disconnect',(reason)=>{
+  console.warn('[socket] disconnected:', reason);
+  myId=null;
+});
+
+socket.on('matchFound',data=>{ console.log('[socket] matchFound', data);
   hide('landing-modal');hide('waiting-modal');
   const me=data.players.find(p=>p.id===myId);
   const op=data.players.find(p=>p.id!==myId);
@@ -421,7 +438,7 @@ socket.on('matchFound',data=>{
   inGame=true;
 });
 
-socket.on('waiting',()=>{hide('landing-modal');show('waiting-modal');});
+socket.on('waiting',()=>{ console.log('[socket] waiting for opponent'); hide('landing-modal'); show('waiting-modal'); });
 
 socket.on('countdown',n=>{
   const ov=document.getElementById('countdown-overlay');
@@ -497,7 +514,18 @@ function togglePause(){
 
 document.getElementById('play-btn').addEventListener('click',()=>{
   const n=document.getElementById('name-input').value.trim()||'Player';
-  myName=n;socket.emit('joinGame',{name:n});
+  myName=n;
+  hide('landing-modal');
+  show('waiting-modal');
+  console.log('[ui] Find Match clicked, socket connected:', socket.connected, 'id:', socket.id);
+  if(socket.connected){
+    console.log('[socket] emitting joinGame:', n);
+    socket.emit('joinGame',{name:n});
+  } else {
+    // Socket not ready yet — store and send on connect
+    console.warn('[socket] not connected yet, queuing joinGame');
+    pendingJoin=n;
+  }
 });
 document.getElementById('name-input').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('play-btn').click();});
 document.getElementById('cancel-btn').addEventListener('click',()=>location.reload());

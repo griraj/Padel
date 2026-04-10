@@ -9,6 +9,7 @@ const io = new Server(server, { cors: { origin: '*' } });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+// ── Game Constants ──────────────────────────────────────────────
 const COURT = { W: 10, H: 20, WALL_H: 4 };
 const BALL_RADIUS = 0.15;
 const PADDLE_W = 1.2, PADDLE_H = 1.4, PADDLE_D = 0.12;
@@ -16,7 +17,7 @@ const BALL_SPEED_INIT = 12;
 const TICK = 1 / 60;
 const WINNING_SCORE = 7;
 
-//room management
+// ── Room Management ─────────────────────────────────────────────
 const rooms = {};
 let waitingPlayer = null;
 
@@ -30,16 +31,13 @@ function createBall() {
   };
 }
 
-function createRoom(p1id, p2id)
-{
-  const room =
-  {
+function createRoom(p1id, p2id) {
+  const room = {
     id: p1id + '_' + p2id,
-    players:{
+    players: {
       [p1id]: { id: p1id, side: 1, x: 0, z: COURT.H / 2 - 1, score: 0, name: 'Player 1' },
       [p2id]: { id: p2id, side: -1, x: 0, z: -(COURT.H / 2 - 1), score: 0, name: 'Player 2' }
     },
-    
     ball: createBall(),
     state: 'countdown',
     countdown: 3,
@@ -50,28 +48,22 @@ function createRoom(p1id, p2id)
   return room;
 }
 
-function resetBall(room, scorerId)
-{
+function resetBall(room, scorerId) {
   const b = createBall();
+  // serve toward the player who just got scored on
   const loser = Object.values(room.players).find(p => p.id !== scorerId);
-
   if (loser) b.vz = loser.side > 0 ? BALL_SPEED_INIT : -BALL_SPEED_INIT;
   room.ball = b;
 }
 
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 
-function tickRoom(room)
-{
-  if (room.state === 'countdown')
-  {
+function tickRoom(room) {
+  if (room.state === 'countdown') {
     room.countdownTimer += TICK;
-
-    if (room.countdownTimer >= 1)
-    {
+    if (room.countdownTimer >= 1) {
       room.countdownTimer = 0;
       room.countdown--;
-
       if (room.countdown <= 0) room.state = 'playing';
       io.to(room.id).emit('countdown', room.countdown);
     }
@@ -84,16 +76,16 @@ function tickRoom(room)
   const hw = COURT.W / 2;
   const hh = COURT.H / 2;
 
-  //movement of the ball
+  // Move ball
   b.x += b.vx * TICK;
   b.y += b.vy * TICK;
   b.z += b.vz * TICK;
 
+  // Gravity
   b.vy -= 9.8 * TICK;
 
-  //floor bounce
-  if (b.y <= BALL_RADIUS)
-  {
+  // Floor bounce
+  if (b.y <= BALL_RADIUS) {
     b.y = BALL_RADIUS;
     b.vy = Math.abs(b.vy) * 0.72;
     b.vx *= 0.88;
@@ -101,47 +93,39 @@ function tickRoom(room)
     b.bounces++;
   }
 
-  //side walls
+  // Side walls
   if (b.x > hw - BALL_RADIUS) { b.x = hw - BALL_RADIUS; b.vx = -Math.abs(b.vx) * 0.85; }
   if (b.x < -(hw - BALL_RADIUS)) { b.x = -(hw - BALL_RADIUS); b.vx = Math.abs(b.vx) * 0.85; }
 
-  //back walls 
-  if (b.z > hh - BALL_RADIUS)
-  {
-    if (b.y <= COURT.WALL_H)
-    {
+  // Back walls (glass)
+  if (b.z > hh - BALL_RADIUS) {
+    if (b.y <= COURT.WALL_H) {
       b.z = hh - BALL_RADIUS; b.vz = -Math.abs(b.vz) * 0.75;
-    }
-    else
-    {
+    } else {
       scorePoint(room, Object.values(room.players).find(p => p.side === -1)?.id);
       return;
     }
   }
-
-  if (b.z < -(hh - BALL_RADIUS))
-  {
-    if (b.y <= COURT.WALL_H)
-    {
+  if (b.z < -(hh - BALL_RADIUS)) {
+    if (b.y <= COURT.WALL_H) {
       b.z = -(hh - BALL_RADIUS); b.vz = Math.abs(b.vz) * 0.75;
-    }
-    else
-    {
+    } else {
       scorePoint(room, Object.values(room.players).find(p => p.side === 1)?.id);
       return;
     }
   }
 
-  if (Math.abs(b.z) < 0.12 && b.y < 1.0)
-  {
+  // Net collision (z=0)
+  if (Math.abs(b.z) < 0.12 && b.y < 1.0) {
+    // Ball hits net — point to other side
     const side = b.vz > 0 ? 1 : -1;
     const scorer = Object.values(room.players).find(p => p.side === -side);
     scorePoint(room, scorer?.id);
     return;
   }
 
-  for (const p of Object.values(room.players))
-  {
+  // Paddle collisions
+  for (const p of Object.values(room.players)) {
     const pz = p.z;
     const px = p.x;
     const dz = b.z - pz;
@@ -151,7 +135,7 @@ function tickRoom(room)
     if (Math.abs(dz) < PADDLE_D + BALL_RADIUS &&
         Math.abs(dx) < PADDLE_W / 2 + BALL_RADIUS &&
         Math.abs(dy) < PADDLE_H / 2 + BALL_RADIUS) {
-
+      // Hit paddle
       b.vz = -Math.sign(dz) * (BALL_SPEED_INIT + b.bounces * 0.5 + Math.random() * 3);
       b.vy = Math.abs(b.vy) * 0.6 + 4;
       b.vx += (dx / (PADDLE_W / 2)) * 5;
@@ -160,8 +144,10 @@ function tickRoom(room)
     }
   }
 
-  if (b.y < -2)
-  {
+  // Ball out of bounds vertically (too high — just let gravity bring it back)
+  // Ball fell through floor
+  if (b.y < -2) {
+    // determine who lost — ball going toward which side
     const side = b.vz > 0 ? 1 : -1;
     const scorer = Object.values(room.players).find(p => p.side !== side);
     scorePoint(room, scorer?.id);
@@ -175,8 +161,7 @@ function tickRoom(room)
   });
 }
 
-function scorePoint(room, scorerId)
-{
+function scorePoint(room, scorerId) {
   if (!scorerId) return;
   const scorer = room.players[scorerId];
   if (!scorer) return;
@@ -187,8 +172,7 @@ function scorePoint(room, scorerId)
     players: Object.values(room.players).map(p => ({ id: p.id, score: p.score, name: p.name }))
   });
 
-  if (scorer.score >= WINNING_SCORE)
-  {
+  if (scorer.score >= WINNING_SCORE) {
     room.state = 'gameover';
     io.to(room.id).emit('gameover', { winner: scorer.name });
     clearInterval(room.interval);
@@ -202,14 +186,15 @@ function scorePoint(room, scorerId)
   io.to(room.id).emit('countdown', room.countdown);
 }
 
+// ── Socket.io ───────────────────────────────────────────────────
 io.on('connection', (socket) => {
   console.log('Player connected:', socket.id);
 
   socket.on('joinGame', (data) => {
     const playerName = (data && data.name) ? data.name.substring(0, 16) : 'Player';
 
-    if (waitingPlayer && waitingPlayer.id !== socket.id)
-    {
+    if (waitingPlayer && waitingPlayer.id !== socket.id) {
+      // Match found
       const p1 = waitingPlayer;
       const p2 = socket;
       waitingPlayer = null;

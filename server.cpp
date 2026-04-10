@@ -30,9 +30,6 @@ namespace websocket = beast::websocket;
 namespace net       = boost::asio;
 using tcp           = net::ip::tcp;
 
-// ═══════════════════════════════════════════════════════════
-//  Tiny JSON builder  (no external lib needed)
-// ═══════════════════════════════════════════════════════════
 static std::string jstr(const std::string& s) {
     std::string r = "\"";
     for (char c : s) {
@@ -47,20 +44,23 @@ static std::string jnum(double v) {
 }
 static std::string jbool(bool v) { return v ? "true" : "false"; }
 
-// ═══════════════════════════════════════════════════════════
-//  Tiny JSON parser  (only what we need)
-// ═══════════════════════════════════════════════════════════
-static std::string jsonGet(const std::string& src, const std::string& key) {
-    // finds "key":"value" or "key":number
+static std::string jsonGet(const std::string& src, const std::string& key)
+{
     std::string needle = "\"" + key + "\"";
     auto pos = src.find(needle);
+
     if (pos == std::string::npos) return "";
     pos += needle.size();
+    
     while (pos < src.size() && (src[pos] == ' ' || src[pos] == ':')) ++pos;
+
     if (pos >= src.size()) return "";
-    if (src[pos] == '"') {
+
+    if (src[pos] == '"')
+    {
         ++pos;
         std::string val;
+        
         while (pos < src.size() && src[pos] != '"') {
             if (src[pos] == '\\') ++pos;
             val += src[pos++];
@@ -76,9 +76,6 @@ static std::string jsonGet(const std::string& src, const std::string& key) {
     return val;
 }
 
-// ═══════════════════════════════════════════════════════════
-//  Game Constants
-// ═══════════════════════════════════════════════════════════
 constexpr double COURT_W   = 10.0;
 constexpr double COURT_H   = 20.0;
 constexpr double WALL_H    = 4.0;
@@ -96,9 +93,6 @@ static double randf(double lo, double hi) {
     return lo + (hi - lo) * std::uniform_real_distribution<double>(0.0, 1.0)(rng);
 }
 
-// ═══════════════════════════════════════════════════════════
-//  Data Structures
-// ═══════════════════════════════════════════════════════════
 struct Ball {
     double x=0, y=1.5, z=0;
     double vx=0, vy=4, vz=BALL_SPD;
@@ -108,7 +102,7 @@ struct Ball {
 struct Player {
     std::string id;
     std::string name;
-    int    side  = 1;   // +1 = positive-Z side, -1 = negative-Z side
+    int    side  = 1;   
     double x     = 0;
     double z     = 0;
     int    score = 0;
@@ -118,14 +112,10 @@ struct Player {
 struct Room;
 using RoomPtr = std::shared_ptr<Room>;
 
-// Forward-declare session so Room can hold weak_ptrs
 struct WsSession;
 using WsSessionPtr = std::shared_ptr<WsSession>;
 using WsSessionWeak = std::weak_ptr<WsSession>;
 
-// ═══════════════════════════════════════════════════════════
-//  Session  (one per connected WebSocket client)
-// ═══════════════════════════════════════════════════════════
 struct WsSession : public std::enable_shared_from_this<WsSession> {
     websocket::stream<tcp::socket> ws_;
     beast::flat_buffer buf_;
@@ -179,19 +169,16 @@ struct WsSession : public std::enable_shared_from_this<WsSession> {
             });
     }
 
-    // Defined below after Server is declared
+
     void onMessage(const std::string& msg);
     void onDisconnect();
 };
 
-// ═══════════════════════════════════════════════════════════
-//  Room
-// ═══════════════════════════════════════════════════════════
 struct Room : public std::enable_shared_from_this<Room> {
     std::string id;
-    std::map<std::string, Player> players;  // key = socket id
+    std::map<std::string, Player> players;  
     Ball   ball;
-    std::string state = "countdown";  // countdown | playing | gameover
+    std::string state = "countdown";  
     int    countdown  = 3;
     double countdownTimer = 0.0;
 
@@ -392,9 +379,6 @@ struct Room : public std::enable_shared_from_this<Room> {
     }
 };
 
-// ═══════════════════════════════════════════════════════════
-//  Server  (global state)
-// ═══════════════════════════════════════════════════════════
 struct Server {
     std::mutex                                     mtx;
     std::map<std::string, WsSessionWeak>           sessions;   // id → session
@@ -574,14 +558,9 @@ struct Server {
     }
 };
 
-// ═══════════════════════════════════════════════════════════
-//  Global server instance  (set in main)
-// ═══════════════════════════════════════════════════════════
+
 static Server* g_server = nullptr;
 
-// ═══════════════════════════════════════════════════════════
-//  WsSession::onMessage / onDisconnect  (now Server is known)
-// ═══════════════════════════════════════════════════════════
 void WsSession::onMessage(const std::string& msg) {
     if (!g_server) return;
     std::string event = jsonGet(msg, "event");
@@ -605,9 +584,6 @@ void WsSession::onDisconnect() {
     if (g_server) g_server->onDisconnect(id_);
 }
 
-// ═══════════════════════════════════════════════════════════
-//  HTTP Session  (serves static files)
-// ═══════════════════════════════════════════════════════════
 class HttpSession : public std::enable_shared_from_this<HttpSession> {
     tcp::socket                    sock_;
     beast::flat_buffer             buf_;
@@ -625,26 +601,25 @@ public:
             });
     }
 
-    void handleRequest() {
-        // Upgrade to WebSocket?
-        if (websocket::is_upgrade(req_)) {
+    void handleRequest()
+    {
+        if (websocket::is_upgrade(req_))
+        {
             auto ws = std::make_shared<WsSession>(std::move(sock_));
+
             if (g_server) g_server->addSession(ws);
-            ws->ws_.async_accept(req_, [ws](beast::error_code ec){
+            ws->ws_.async_accept(req_, [ws](beast::error_code ec) {
                 if (!ec) ws->doRead();
             });
             return;
         }
 
-        // Serve static files from ./public/
         std::string target = std::string(req_.target());
         if (target == "/" || target.empty()) target = "/index.html";
 
-        // Strip query
         auto qpos = target.find('?');
         if (qpos != std::string::npos) target = target.substr(0, qpos);
 
-        // Prevent path traversal
         if (target.find("..") != std::string::npos) {
             sendError(http::status::bad_request, "Bad path");
             return;
@@ -657,12 +632,21 @@ public:
         std::string body((std::istreambuf_iterator<char>(file)),
                           std::istreambuf_iterator<char>());
 
-        // Simple MIME
-        auto mime = [](const std::string& p) -> std::string {
-            if (p.ends_with(".html")) return "text/html";
-            if (p.ends_with(".js"))   return "application/javascript";
-            if (p.ends_with(".css"))  return "text/css";
-            if (p.ends_with(".png"))  return "image/png";
+        auto endsWith = [](const std::string& str, const std::string& suffix) -> bool
+        {
+            if (suffix.size() > str.size())
+            {
+                return false;
+            }
+            return str.rfind(suffix) == (str.size() - suffix.size());
+        };
+
+        auto mime = [&endsWith](const std::string& p) -> std::string
+        {
+            if (endsWith(p, ".html")) return "text/html";
+            if (endsWith(p, ".js"))   return "application/javascript";
+            if (endsWith(p, ".css"))  return "text/css";
+            if (endsWith(p, ".png"))  return "image/png";
             return "application/octet-stream";
         };
 
@@ -689,9 +673,6 @@ public:
     }
 };
 
-// ═══════════════════════════════════════════════════════════
-//  Listener
-// ═══════════════════════════════════════════════════════════
 class Listener : public std::enable_shared_from_this<Listener> {
     net::io_context& ioc_;
     tcp::acceptor    acceptor_;
@@ -720,9 +701,6 @@ public:
     }
 };
 
-// ═══════════════════════════════════════════════════════════
-//  main
-// ═══════════════════════════════════════════════════════════
 int main() {
     unsigned short port = 3000;
     const char* envPort = std::getenv("PORT");
